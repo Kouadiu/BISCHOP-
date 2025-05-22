@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Menu Principal</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        body {
+            background: white;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow-x: hidden;
+        }
+
+        .welcome-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #8A2387, #E94057, #F27121);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            animation: welcomeFade 2s forwards;
+        }
+
+        .welcome-text {
+            color: white;
+            font-size: 36px;
+            font-weight: bold;
+            opacity: 0;
+            animation: textPulse 1.5s forwards;
+        }
+
+        @keyframes welcomeFade {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; visibility: hidden; }
+        }
+
+        @keyframes textPulse {
+            0% { opacity: 0; transform: scale(0.8); }
+            50% { opacity: 1; transform: scale(1.1); }
+            100% { opacity: 1; transform: scale(1); }
+        }
+
+        .container {
+            text-align: center;
+            opacity: 0;
+            transform: translateY(50px);
+            animation: fadeIn 1.5s 1.8s forwards;
+            width: 100%;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        @keyframes fadeIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            color: #8A2387;
+            margin: 20px 0;
+            padding: 15px;
+            text-align: center;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .buttons-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+        }
+
+        .button {
+            display: flex;
+            align-items: center;
+            padding: 20px;
+            background: linear-gradient(135deg, #8A2387, #E94057, #F27121);
+            border: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            opacity: 0;
+            margin-bottom: 5px;
+            border-radius: 5px;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .button:last-child {
+            border-bottom: none;
+        }
+
+        .button:hover {
+            background: linear-gradient(135deg, #9A3397, #F95067, #F38131);
+            padding-left: 30px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+            transform: scale(1.02);
+        }
+
+        .button-icon {
+            width: 30px;
+            height: 30px;
+            margin-right: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .button-text {
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        @keyframes buttonFadeIn {
+            to { 
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #8A2387, #E94057);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 90;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+            opacity: 0;
+            animation: fadeIn 0.5s 3.8s forwards;
+            transition: all 0.3s ease;
+        }
+
+        .back-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.3);
+        }
+
+        .back-button svg {
+            width: 24px;
+            height: 24px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Animation de bienvenue -->
+    <div class="welcome-animation">
+        <div class="welcome-text">BISCHOP</div>
+    </div>
+
+    <!-- Bouton retour -->
+    <div class="back-button">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+            <path d="M19 12H5"></path>
+            <path d="M12 19l-7-7 7-7"></path>
+        </svg>
+    </div>
+
+    <div class="container">
+        <h1>Menu Principal</h1>
+        
+        <div class="buttons-container">
+            <!-- Bouton Recharge -->
+            <a href="recharge.html" class="button" data-link="recharge.html" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <path d="M21 8v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                        <path d="M17 14h.01M12 16V8M9 12h6"></path>
+                    </svg>
+                </div>
+                <div class="button-text">Recharge</div>
+            </a>
+            
+            <!-- Bouton Historique de Recharge -->
+            <a href="historique.html" class="button" data-link="historique.html" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2.15s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <polyline points="12 6 12 12 16 14"></polyline>
+                    </svg>
+                </div>
+                <div class="button-text">Historique de Recharge</div>
+            </a>
+
+            <!-- Bouton Retrait -->
+            <a href="retrait.html" class="button" data-link="retrait.html" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2.3s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <path d="M19 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2Z"></path>
+                        <path d="M12 9v6M9 12h6"></path>
+                    </svg>
+                </div>
+                <div class="button-text">Retrait</div>
+            </a>
+
+            <!-- Bouton Mon Équipe -->
+            <a href="equipe.html" class="button" data-link="equipe.html" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2.45s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="9" cy="7" r="4"></circle>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                    </svg>
+                </div>
+                <div class="button-text">Mon Équipe</div>
+            </a>
+            
+            <!-- Bouton Cadeaux -->
+            <a href="#" class="button" data-link="#" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2.6s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <path d="M20 12v10H4V12"></path>
+                        <path d="M22 7H2v5h20V7z"></path>
+                        <path d="M12 22V7"></path>
+                        <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path>
+                        <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path>
+                    </svg>
+                </div>
+                <div class="button-text">Cadeaux</div>
+            </a>
+
+            <!-- Bouton Déconnexion -->
+            <a href="index.html" class="button" data-link="logout" style="transform: translateX(-100%); animation: buttonFadeIn 0.5s 2.75s forwards;">
+                <div class="button-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                        <path d="M16 17l5-5-5-5"></path>
+                        <path d="M21 12H9"></path>
+                    </svg>
+                </div>
+                <div class="button-text">Déconnexion</div>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Fonction pour le bouton retour
+        document.querySelector('.back-button').addEventListener('click', function() {
+            window.history.back();
+        });
+
+        // Gestion des clics sur les boutons du menu
+        document.querySelectorAll('.button').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                const link = this.getAttribute('data-link');
+                
+                // Gestion spéciale pour la déconnexion
+                if (link === 'logout') {
+                    if (confirm('Êtes-vous sûr de vouloir vous déconnecter ?')) {
+                        // Ici vous pouvez ajouter votre logique de déconnexion
+                        alert('Déconnexion en cours...');
+                        // window.location.href = 'index.html'; // Exemple
+                    }
+                    return;
+                }
+                
+                // Navigation vers les autres pages
+                if (link && link !== 'index.html') {
+                    window.location.href = link;
+                }
+            });
+        });
+    </script>
+</body>
+</html>

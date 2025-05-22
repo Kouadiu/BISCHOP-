@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FiLAND</title>
+    <style>
+        /* Reset et styles de base */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: Arial, sans-serif;
+        }
+        
+        body {
+            background-color: #f0f2f8;
+        }
+        
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            position: relative;
+            height: 100vh;
+            padding-bottom: 80px; /* Espace pour la navigation */
+        }
+        
+        .content-wrapper {
+            padding-bottom: 30px;
+        }
+        
+        /* Styles du header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background-color: #f0f2f8;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+        }
+        
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #ff9934, #ff5c34);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            margin-right: 10px;
+            position: relative;
+            box-shadow: 0 0 10px rgba(255, 156, 52, 0.7);
+        }
+        
+        .logo span {
+            position: relative;
+            z-index: 2;
+        }
+        
+        .logo-text {
+            color: #333;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        
+        .menu-btn, .notification-btn {
+            width: 30px;
+            height: 30px;
+            background-color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+        }
+        
+        .notification-btn {
+            position: relative;
+        }
+        
+        .notification-badge {
+            position: absolute;
+            top: -3px;
+            right: -3px;
+            width: 8px;
+            height: 8px;
+            background-color: red;
+            border-radius: 50%;
+        }
+        
+        /* Styles de la section Telegram */
+        .telegram-section {
+            background-color: white;
+            margin: 15px;
+            padding: 15px;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+        }
+        
+        .telegram-icon {
+            width: 50px;
+            height: 50px;
+            background-color: #27a2e1;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 15px;
+        }
+        
+        .telegram-icon img {
+            width: 30px;
+            height: 30px;
+        }
+        
+        .telegram-text {
+            flex: 1;
+        }
+        
+        .telegram-text h2 {
+            font-size: 16px;
+            color: #444;
+            margin-bottom: 5px;
+        }
+        
+        .telegram-text p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .telegram-text a {
+            color: #27a2e1;
+            text-decoration: none;
+        }
+        
+        /* Styles de la section compte */
+        .account-section {
+            background-color: white;
+            margin: 15px;
+            padding: 20px;
+            border-radius: 15px;
+        }
+        
+        .account-info {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .account-logo {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #ff9934, #ff5c34);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 20px;
+            margin-right: 15px;
+            box-shadow: 0 0 10px rgba(255, 156, 52, 0.7);
+        }
+        
+        .account-details {
+            flex: 1;
+        }
+        
+        .account-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .account-email {
+            font-size: 14px;
+            color: #999;
+        }
+        
+        .account-actions {
+            display: flex;
+            align-items: center;
+        }
+        
+        .action-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #f0f2f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 10px;
+            cursor: pointer;
+        }
+        
+        .blue-btn {
+            background-color: #1a4cd9;
+            color: white;
+        }
+        
+        /* Styles de la carte de solde */
+        .balance-card {
+            background-color: #1a4cd9;
+            border-radius: 15px;
+            padding: 20px;
+            color: white;
+            text-align: center;
+            margin-top: 10px;
+        }
+        
+        .balance-amount {
+            font-size: 40px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .balance-label {
+            font-size: 16px;
+            letter-spacing: 1px;
+            opacity: 0.8;
+        }
+        
+        /* Styles des statistiques */
+        .stats-section {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px;
+        }
+        
+        .stat-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 15px;
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .stat-card:last-child {
+            margin-right: 0;
+        }
+        
+        .stat-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        
+        .yellow-bg {
+            background-color: #ffb700;
+        }
+        
+        .green-bg {
+            background-color: #27ae60;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: #999;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 22px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        /* Styles de la navigation */
+        .navigation {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+            background-color: white;
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 10px;
+            border-top-left-radius: 30px;
+            border-top-right-radius: 30px;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+        
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 12px;
+            color: #999;
+            text-decoration: none;
+            width: 20%; /* Distribution égale */
+        }
+        
+        .nav-icon {
+            width: 24px;
+            height: 24px;
+            margin-bottom: 5px;
+        }
+        
+        .nav-active {
+            color: #1a4cd9;
+        }
+        
+        .nav-circle {
+            width: 60px;
+            height: 60px;
+            background-color: #1a4cd9;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: -50px;
+            box-shadow: 0 4px 10px rgba(26, 76, 217, 0.5);
+            margin-left: auto;
+            margin-right: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- En-tête de l'application -->
+        <header>
+            <a href="m.html" class="menu-btn">
+                <svg width="18" height="12" viewBox="0 0 18 12" fill="none">
+                    <path d="M1 1H17M1 6H17M1 11H17" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+            </a>
+            <div class="logo-container">
+                <div class="logo">
+                    <span>BI</span>
+                </div>
+                <div class="logo-text">BISHOP</div>
+            </div>
+            <a href="#notifications" class="notification-btn">
+                <svg width="16" height="18" viewBox="0 0 16 18" fill="none">
+                    <path d="M8 18C9.1 18 10 17.1 10 16H6C6 17.1 6.9 18 8 18ZM14 13V8C14 5.23 12.11 2.89 9.5 2.17V1.5C9.5 0.67 8.83 0 8 0C7.17 0 6.5 0.67 6.5 1.5V2.17C3.89 2.89 2 5.23 2 8V13L0 15V16H16V15L14 13Z" fill="#333"/>
+                </svg>
+                <div class="notification-badge"></div>
+            </a>
+        </header>
+
+        <!-- Contenu principal -->
+        <div class="content-wrapper">
+            <!-- Section groupe Telegram -->
+            <div class="telegram-section">
+                <div class="telegram-icon">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                        <path d="M9.78 18.65L10.06 14.42L17.5 7.13C17.87 6.8 17.42 6.62 16.93 6.92L7.58 13.12L3.75 11.85C2.76 11.53 2.74 10.95 3.95 10.45L19.73 4.35C20.57 3.95 21.35 4.43 21.01 5.74L18.07 18.65C17.84 19.73 17.18 19.99 16.35 19.52L12.24 16.49L10.25 18.38C9.99 18.64 9.78 18.85 9.78 18.65Z" fill="white"/>
+                    </svg>
+                </div>
+                <div class="telegram-text">
+                    <h2>GROUPE OFFICIEL TELEGRAM</h2>
+                    <p>Lien: <a href="https://t.me/filand_groupe" target="_blank">https://t.me/filand_groupe</a></p>
+                </div>
+            </div>
+
+            <!-- Section du compte utilisateur -->
+            <div class="account-section">
+                <div class="account-info">
+                    <div class="account-logo">
+                        <span>BI</span>
+                    </div>
+                    <div class="account-details">
+                        <div class="account-name">Identifiant</div>
+                        <div class="account-email" id="email">Chargements</div>
+                    </div>
+                    <div class="account-actions">
+                        <a href="#add" class="action-btn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 3V13M3 8H13" stroke="#333" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </a>
+                        <a href="#deposit" class="action-btn blue-btn">
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M8 3V13M3 8H13" stroke="white" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Affichage du solde -->
+                <div class="balance-card">
+                    <div class="balance-amount" id="balance">Chargement<sup></sup></div>
+                    <div class="balance-amount" id="balanceHidden" style="display: none;">•••••<sup>XOF</sup></div>
+                    <div class="balance-label">SOLDE TOTAL</div>
+                </div>
+            </div>
+
+            <!-- Section des statistiques -->
+            <div class="stats-section">
+                <div class="stat-card">
+                    <div class="stat-icon yellow-bg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M12 17.77L18.18 21.5L16.54 14.47L22 9.74L14.81 9.13L12 2.5L9.19 9.13L2 9.74L7.46 14.47L5.82 21.5L12 17.77Z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div class="stat-label">Gagner 4% chaque jour sur votre montant déposer</div>
+                    <div class="stat-value">BISCHOP</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon green-bg">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M17 10.5V7C17 4.24 14.76 2 12 2C9.24 2 7 4.24 7 7V10.5C5.9 10.5 5 11.4 5 12.5V20.5C5 21.6 5.9 22.5 7 22.5H17C18.1 22.5 19 21.6 19 20.5V12.5C19 11.4 18.1 10.5 17 10.5ZM12 17.5C10.9 17.5 10 16.6 10 15.5C10 14.4 10.9 13.5 12 13.5C13.1 13.5 14 14.4 14 15.5C14 16.6 13.1 17.5 12 17.5ZM15 10.5H9V7C9 5.34 10.34 4 12 4C13.66 4 15 5.34 15 7V10.5Z" fill="white"/>
+                        </svg>
+                    </div>
+                    <div class="stat-label">Pourcentage</div>
+                    <div class="stat-value">Gagner 4%</div>
+                    <div class="stat-value">Chaque jour</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Barre de navigation fixe en bas -->
+        <div class="navigation">
+            <a href="#dashboard" class="nav-item nav-active">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M10 20V14H14V20H19V12H22L12 3L2 12H5V20H10Z" fill="#1a4cd9"/>
+                </svg>
+                <span>Dashboard</span>
+            </a>
+            <a href="historique_retrait.html" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M13 3C8.03 3 4 7.03 4 12H1L4.89 15.89L4.96 16.03L9 12H6C6 8.13 9.13 5 13 5C16.87 5 20 8.13 20 12C20 15.87 16.87 19 13 19C11.07 19 9.32 18.21 8.06 16.94L6.64 18.36C8.27 19.99 10.51 21 13 21C17.97 21 22 16.97 22 12C22 7.03 17.97 3 13 3ZM12 8V13L16.28 15.54L17 14.33L13.5 12.25V8H12Z" fill="#999"/>
+                </svg>
+                <span>Historique</span>
+            </a>
+            <a href="star.html" class="nav-item">
+                <div class="nav-circle">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 4H4C2.89 4 2.01 4.89 2.01 6L2 18C2 19.11 2.89 20 4 20H20C21.11 20 22 19.11 22 18V6C22 4.89 21.11 4 20 4ZM20 18H4V12H20V18ZM20 8H4V6H20V8Z" fill="white"/>
+                    </svg>
+                </div>
+                <span>Statistiques</span>
+            </a>
+            <a href="lier_portefeuille.html" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 18V19C21 20.1 20.1 21 19 21H5C3.89 21 3 20.1 3 19V5C3 3.9 3.89 3 5 3H19C20.1 3 21 3.9 21 5V6H12C10.89 6 10 6.9 10 8V16C10 17.1 10.89 18 12 18H21ZM12 16H22V8H12V16ZM16 13.5C15.17 13.5 14.5 12.83 14.5 12C14.5 11.17 15.17 10.5 16 10.5C16.83 10.5 17.5 11.17 17.5 12C17.5 12.83 16.83 13.5 16 13.5Z" fill="#999"/>
+                </svg>
+                <span>Mon wallet</span>
+            </a>
+            <a href="carte.html" class="nav-item">
+                <svg class="nav-icon" width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 5C13.66 5 15 6.34 15 8C15 9.66 13.66 11 12 11C10.34 11 9 9.66 9 8C9 6.34 10.34 5 12 5ZM12 19.2C9.5 19.2 7.29 17.92 6 15.98C6.03 13.99 10 12.9 12 12.9C13.99 12.9 17.97 13.99 18 15.98C16.71 17.92 14.5 19.2 12 19.2Z" fill="#999"/>
+                </svg>
+                <span>Ma carte</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Script de base pour la navigation -->
+    <script>
+        // Script pour la navigation et fonctionnalités UI
+        document.addEventListener('DOMContentLoaded', function() {
+            // Gestion des liens de navigation
+            const navLinks = document.querySelectorAll('.nav-item');
+            navLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    // Retirer la classe active de tous les liens
+                    navLinks.forEach(item => item.classList.remove('nav-active'));
+                    
+                    // Mettre à jour les icônes pour toutes
+                    navLinks.forEach(item => {
+                        const icon = item.querySelector('.nav-icon path');
+                        if (icon) icon.setAttribute('fill', '#999');
+                    });
+                    
+                    // Ajouter la classe active au lien cliqué
+                    this.classList.add('nav-active');
+                    
+                    // Mettre à jour l'icône du lien actif
+                    const activeIcon = this.querySelector('.nav-icon path');
+                    if (activeIcon) activeIcon.setAttribute('fill', '#1a4cd9');
+                });
+            });
+            
+            // Implémentation pour afficher/masquer le solde (si les éléments existent)
+            const toggleBalanceBtn = document.getElementById('toggleBalance');
+            const balanceElement = document.getElementById('balance');
+            const balanceHiddenElement = document.getElementById('balanceHidden');
+            
+            if (toggleBalanceBtn && balanceElement && balanceHiddenElement) {
+                let isBalanceVisible = true;
+                
+                toggleBalanceBtn.addEventListener('click', () => {
+                    isBalanceVisible = !isBalanceVisible;
+                    
+                    if (isBalanceVisible) {
+                        balanceElement.style.display = 'block';
+                        balanceHiddenElement.style.display = 'none';
+                    } else {
+                        balanceElement.style.display = 'none';
+                        balanceHiddenElement.style.display = 'block';
+                    }
+                });
+            }
+        });
+    </script>
+    
+    <!-- Firebase configuration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+        // Configuration Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
+            authDomain: "paris-3df9f.firebaseapp.com",
+            databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
+            projectId: "paris-3df9f",
+            storageBucket: "paris-3df9f.appspot.com",
+            messagingSenderId: "365107415196",
+            appId: "1:365107415196:web:4c0021baec5a51a0f50559"
+        };
+
+        // Initialisation de Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const database = getDatabase(app);
+
+        // Fonction pour initialiser un compte utilisateur
+        async function initializeUserAccount(user) {
+            const userRef = ref(database, 'users/' + user.uid);
+            const snapshot = await get(userRef);
+            if (!snapshot.exists()) {
+                await set(userRef, {
+                    email: user.email,
+                    balance: 200,
+                    createdAt: new Date().toISOString()
+                });
+                console.log("Nouveau compte créé avec 200F");
+            }
+        }
+
+        // Observer l'état d'authentification
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                // Utilisateur connecté
+                const emailElement = document.getElementById("email");
+                if (emailElement) emailElement.innerText = user.email;
+                
+                await initializeUserAccount(user);
+                
+                const userRef = ref(database, 'users/' + user.uid);
+                onValue(userRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val();
+                        const balanceElement = document.getElementById("balance");
+                        if (balanceElement) balanceElement.innerText = `${userData.balance} FCFA`;
+                    }
+                });
+            } else {
+                // Utilisateur non connecté
+                const balanceElement = document.getElementById("balance");
+                if (balanceElement) balanceElement.innerText = "Veuillez vous connecter";
+                
+                const emailElement = document.getElementById("email");
+                if (emailElement) emailElement.innerText = "Non connecté";
+            }
+        });
+
+        // Fonction pour créer un compte utilisateur
+        window.createAccount = async function(email, password) {
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error("Erreur lors de la création du compte:", error);
+                throw error;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historique de Retrait</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 0;
+        }
+
+        .phone-container {
+            max-width: 390px;
+            margin: 0 auto;
+            background: white;
+            min-height: 100vh;
+            position: relative;
+        }
+
+        .top-bar {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 50px 20px 30px;
+            text-align: center;
+            border-radius: 0 0 30px 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        }
+
+        .back-btn {
+            position: absolute;
+            top: 50px;
+            left: 20px;
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 40px;
+        }
+
+        .top-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .top-subtitle {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 30px 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+        }
+
+        .amount-section {
+            text-align: center;
+            padding: 20px 0;
+            background: linear-gradient(135deg, #f8f9ff 0%, #fff 100%);
+            border-radius: 15px;
+            margin-bottom: 25px;
+        }
+
+        .amount-label {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .amount-value {
+            font-size: 36px;
+            font-weight: 800;
+            color: #4CAF50;
+            margin-bottom: 5px;
+        }
+
+        .currency {
+            font-size: 18px;
+            color: #666;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 0;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #666;
+            font-size: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .detail-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #4CAF50;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 10px;
+        }
+
+        .detail-value {
+            font-weight: 600;
+            color: #333;
+            font-size: 15px;
+        }
+
+        .status-card {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            text-align: center;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-icon {
+            font-size: 30px;
+            margin-bottom: 10px;
+        }
+
+        .status-text {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .status-subtext {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .footer-info {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+            font-size: 12px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            margin: 20px 0;
+        }
+
+        .reference-number {
+            font-family: monospace;
+            font-weight: 600;
+            color: #666;
+            margin-top: 8px;
+        }
+
+        .divider {
+            height: 2px;
+            background: linear-gradient(90deg, transparent 0%, #4CAF50 50%, transparent 100%);
+            margin: 25px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="phone-container">
+        <div class="top-bar">
+            <button class="back-btn">←</button>
+            <div class="top-title">Historique de Retrait</div>
+            <div class="status-badge">
+                <span class="status-dot"></span>
+                APPROUVÉ
+            </div>
+        </div>
+
+        <div class="main-content">
+
+            <div class="card">
+                <div class="amount-section">
+                    <div class="amount-label">Montant Retiré</div>
+                    <div class="amount-value">5 000<span class="currency"> F</span></div>
+                </div>
+
+                <div class="divider"></div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <div class="detail-icon">📅</div>
+                        Date de retrait
+                    </div>
+                    <div class="detail-value">22 Mai 2025</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <div class="detail-icon">📱</div>
+                        Numéro récepteur
+                    </div>
+                    <div class="detail-value">056 456 954</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <div class="detail-icon">💳</div>
+                        Frais de retrait
+                    </div>
+                    <div class="detail-value">Inclus ✓</div>
+                </div>
+
+                <div class="detail-row">
+                    <div class="detail-label">
+                        <div class="detail-icon">⏰</div>
+                        Heure
+                    </div>
+                    <div class="detail-value">14:32</div>
+                </div>
+            </div>
+
+            <div class="footer-info">
+                <div>Transaction sécurisée et cryptée</div>
+                <div class="reference-number">Réf: RTR-20250522-5000</div>
+                <div style="margin-top: 10px; font-size: 11px;">
+                    Conservez ce reçu pour vos archives personnelles
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

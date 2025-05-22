@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Identifiant</title>
+    
+    <!-- External Resources -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Inline Styles -->
+    <style>
+        /* Existing styles remain the same */
+        
+        /* Add new style for identification section */
+        .identification-section {
+            background-color: #FF6F00;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- New Identification Section -->
+        <div class="identification-section">
+            Identifiant
+        </div>
+
+        <!-- Existing header section (optional, you can remove it if needed) -->
+        <header class="header">
+            <div class="header-logo">
+                <div class="logo-container">
+                    <span class="material-icons" style="color: #FF6F00; font-size: 2rem;">fingerprint</span>
+                </div>
+                <div class="header-title">Identifiant</div>
+            </div>
+            <div class="balance-section">
+                <span></span>
+                <span class="material-icons"></span>
+            </div>
+        </header>
+
+        <!-- Rest of the existing code remains the same -->
+        <!-- Balance Display Section -->
+        <div class="balance-display">
+            <div class="balance-container">
+                <div class="balance-inner">
+                    <div class="balance-amount">
+                        <span>0 F</span>
+                        <span class="material-icons balance-visibility">visibility_off</span>
+                    </div>
+                    <div class="balance-details">
+                        <span class="balance-label">Solde disponible</span>
+                        <span class="balance-label">Daniel Kouame</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Actions Section -->
+        <div class="quick-actions">
+            <div class="action-item">
+                <div class="action-icon">
+                    <span class="material-icons">file_upload</span>
+                </div>
+                <span class="action-label">Depot</span>
+            </div>
+            <div class="action-item">
+                <div class="action-icon">
+                    <span class="material-icons">file_download</span>
+                </div>
+                <span class="action-label">Retrait</span>
+            </div>
+            <div class="action-item">
+                <div class="action-icon">
+                    <span class="material-icons rotate-45">add</span>
+                </div>
+                <span class="action-label">Compte retrait</span>
+            </div>
+            <div class="action-item">
+                <div class="action-icon">
+                    <span class="material-icons">shopping_bag</span>
+                </div>
+                <span class="action-label">Visite du numéro retrait</span>
+            </div>
+        </div>
+
+        <!-- Services Section -->
+        <div class="services">
+            <h2 style="font-weight: bold; margin-bottom: 10px;">Services</h2>
+            <div class="services-grid">
+                <div class="service-item">
+                    <span class="material-icons" style="color: #1DA1F2;">telegram</span>
+                    <span>Groupe Télégramme</span>
+                </div>
+                <div class="service-item">
+                    <span class="material-icons" style="color: #4CAF50;">headset_mic</span>
+                    <span>Service client direct</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Information Card Section -->
+        <div class="info-card">
+            <div class="info-card-header">
+                <span class="material-icons info-card-icon">support_agent</span>
+                <span class="info-card-badge">24/7</span>
+            </div>
+            <div class="info-card-content">
+                <div class="info-card-title">Besoin d'aide urgente ?</div>
+                <div class="info-card-text">Notre équipe de support est disponible 24 heures sur 24, 7 jours sur 7 pour résoudre vos problèmes et répondre à vos questions.</div>
+            </div>
+            <a href="#" class="info-card-action">Contacter Support</a>
+        </div>
+
+        <!-- Bottom Navigation -->
+        <div class="bottom-nav">
+            <div class="nav-item active">
+                <span class="material-icons">home</span>
+                <span class="nav-item-label">Accueil</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons">bar_chart</span>
+                <span class="nav-item-label">Statistiques</span>
+            </div>
+            <div class="nav-item">
+                <span class="material-icons">settings</span>
+                <span class="nav-item-label">Paramètres</span>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Firebase Configuration and Authentication Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
+            authDomain: "paris-3df9f.firebaseapp.com",
+            databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
+            projectId: "paris-3df9f",
+            storageBucket: "paris-3df9f.appspot.com",
+            messagingSenderId: "365107415196",
+            appId: "1:365107415196:web:4c0021baec5a51a0f50559"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const database = getDatabase(app);
+
+        // Initialize User Account
+        async function initializeUserAccount(user) {
+            const userRef = ref(database, 'users/' + user.uid);
+            const snapshot = await get(userRef);
+            if (!snapshot.exists()) {
+                await set(userRef, {
+                    email: user.email,
+                    balance: 200,
+                    createdAt: new Date().toISOString()
+                });
+                console.log("Nouveau compte créé avec 200F");
+            }
+        }
+
+        // Authentication State Observer
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                await initializeUserAccount(user);
+                const userRef = ref(database, 'users/' + user.uid);
+                onValue(userRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val();
+                        document.querySelector('.balance-amount span').textContent = `${userData.balance} FCFA`;
+                    }
+                });
+            } else {
+                document.querySelector('.balance-amount span').textContent = "Veuillez vous connecter";
+            }
+        });
+
+        // Account Creation Function
+        window.createAccount = async function(email, password) {
+            try {
+                await createUserWithEmailAndPassword(auth, email, password);
+            } catch (error) {
+                console.error("Erreur lors de la création du compte:", error);
+                throw error;
+            }
+        }
+    </script>
+
+    <!-- UI Interaction Script -->
+    <script>
+        // Balance Visibility Toggle
+        const balanceVisibilityButton = document.querySelector('.balance-visibility');
+        const balanceAmount = document.querySelector('.balance-amount span');
+        let isBalanceVisible = true;
+
+        balanceVisibilityButton.addEventListener('click', () => {
+            isBalanceVisible = !isBalanceVisible;
+            
+            if (isBalanceVisible) {
+                balanceVisibilityButton.textContent = 'visibility';
+                // Ici, vous pouvez ajouter la logique pour afficher le solde réel
+            } else {
+                balanceVisibilityButton.textContent = 'visibility_off';
+                // Ici, vous pouvez ajouter la logique pour masquer le solde
+            }
+        });
+    </script>
+</body>
+</html>
