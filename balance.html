@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FiLAND</title>
+    <title>solde principal</title>
     <style>
         /* Reset et styles de base */
         * {
@@ -520,7 +520,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, createUserWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-        import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+        import { getDatabase, ref, set, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
         // Configuration Firebase
         const firebaseConfig = {
@@ -540,54 +540,244 @@
 
         // Fonction pour initialiser un compte utilisateur
         async function initializeUserAccount(user) {
-            const userRef = ref(database, 'users/' + user.uid);
-            const snapshot = await get(userRef);
-            if (!snapshot.exists()) {
-                await set(userRef, {
-                    email: user.email,
-                    balance: 200,
-                    createdAt: new Date().toISOString()
-                });
-                console.log("Nouveau compte créé avec 200F");
+            try {
+                const userRef = ref(database, 'users/' + user.uid);
+                const snapshot = await get(userRef);
+                
+                if (!snapshot.exists()) {
+                    // Créer un nouveau compte avec les champs harmonisés
+                    await set(userRef, {
+                        email: user.email,
+                        solde: 200, // Utiliser 'solde' au lieu de 'balance' pour correspondre au script de crédit
+                        balance: 200, // Garder aussi 'balance' pour la compatibilité
+                        commissionBalance: 0,
+                        createdAt: new Date().toISOString()
+                    });
+                    console.log("✅ Nouveau compte créé avec 200 FCFA");
+                } else {
+                    // Harmoniser les données existantes si nécessaire
+                    const userData = snapshot.val();
+                    const updates = {};
+                    
+                    // Si 'solde' n'existe pas mais 'balance' existe, copier la valeur
+                    if (userData.balance && !userData.solde) {
+                        updates[`users/${user.uid}/solde`] = userData.balance;
+                    }
+                    // Si 'balance' n'existe pas mais 'solde' existe, copier la valeur
+                    else if (userData.solde && !userData.balance) {
+                        updates[`users/${user.uid}/balance`] = userData.solde;
+                    }
+                    
+                    // Ajouter commissionBalance si manquant
+                    if (userData.commissionBalance === undefined) {
+                        updates[`users/${user.uid}/commissionBalance`] = 0;
+                    }
+                    
+                    if (Object.keys(updates).length > 0) {
+                        await update(ref(database), updates);
+                        console.log("🔄 Données utilisateur harmonisées");
+                    }
+                }
+            } catch (error) {
+                console.error("❌ Erreur lors de l'initialisation du compte:", error);
             }
+        }
+
+        // Fonction pour formater le solde avec animation
+        function updateBalanceDisplay(balance, isUpdate = false) {
+            const balanceElement = document.getElementById("balance");
+            if (!balanceElement) return;
+            
+            const formattedBalance = `${parseFloat(balance).toLocaleString('fr-FR')} FCFA`;
+            
+            if (isUpdate) {
+                // Animation de mise à jour
+                balanceElement.style.transition = 'all 0.3s ease';
+                balanceElement.style.color = '#28a745'; // Vert pour indiquer une mise à jour
+                balanceElement.style.transform = 'scale(1.05)';
+                
+                setTimeout(() => {
+                    balanceElement.style.color = '';
+                    balanceElement.style.transform = 'scale(1)';
+                }, 1000);
+            }
+            
+            balanceElement.textContent = formattedBalance;
+        }
+
+        // Fonction pour afficher les notifications de crédit
+        function showCreditNotification(amount) {
+            // Créer une notification temporaire
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: linear-gradient(135deg, #28a745, #20c997);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+                z-index: 1000;
+                font-weight: bold;
+                animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+                min-width: 250px;
+                text-align: center;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 20px;">💰</span>
+                    <div>
+                        <div>Recharge créditée !</div>
+                        <div style="font-size: 14px; opacity: 0.9;">+${parseFloat(amount).toLocaleString('fr-FR')} FCFA</div>
+                    </div>
+                </div>
+            `;
+            
+            // Ajouter les animations CSS
+            if (!document.getElementById('credit-notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'credit-notification-styles';
+                style.textContent = `
+                    @keyframes slideIn {
+                        from { transform: translateX(100%); opacity: 0; }
+                        to { transform: translateX(0); opacity: 1; }
+                    }
+                    @keyframes fadeOut {
+                        from { opacity: 1; }
+                        to { opacity: 0; }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Supprimer la notification après 3 secondes
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 3000);
         }
 
         // Observer l'état d'authentification
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Utilisateur connecté
-                const emailElement = document.getElementById("email");
-                if (emailElement) emailElement.innerText = user.email;
+                console.log(`👤 Utilisateur connecté: ${user.uid}`);
                 
+                // Afficher l'email
+                const emailElement = document.getElementById("email");
+                if (emailElement) emailElement.textContent = user.email;
+                
+                // Initialiser le compte utilisateur
                 await initializeUserAccount(user);
                 
+                // Observer les changements de solde en temps réel
                 const userRef = ref(database, 'users/' + user.uid);
+                let previousBalance = null;
+                
                 onValue(userRef, (snapshot) => {
                     if (snapshot.exists()) {
                         const userData = snapshot.val();
-                        const balanceElement = document.getElementById("balance");
-                        if (balanceElement) balanceElement.innerText = `${userData.balance} FCFA`;
+                        
+                        // Utiliser 'solde' en priorité, puis 'balance' comme fallback
+                        const currentBalance = userData.solde !== undefined ? userData.solde : userData.balance || 0;
+                        
+                        // Détecter si c'est une mise à jour (augmentation du solde)
+                        const isUpdate = previousBalance !== null && currentBalance > previousBalance;
+                        
+                        // Si c'est une augmentation, afficher la notification
+                        if (isUpdate) {
+                            const difference = currentBalance - previousBalance;
+                            console.log(`💰 Solde mis à jour: +${difference} FCFA (nouveau solde: ${currentBalance} FCFA)`);
+                            showCreditNotification(difference);
+                        }
+                        
+                        // Mettre à jour l'affichage
+                        updateBalanceDisplay(currentBalance, isUpdate);
+                        
+                        // Afficher la commission si elle existe
+                        const commissionElement = document.getElementById("commission");
+                        if (commissionElement && userData.commissionBalance !== undefined) {
+                            commissionElement.textContent = `${parseFloat(userData.commissionBalance).toLocaleString('fr-FR')} FCFA`;
+                        }
+                        
+                        // Sauvegarder le solde actuel pour la prochaine comparaison
+                        previousBalance = currentBalance;
+                        
+                        console.log(`💳 Solde actuel: ${currentBalance} FCFA`);
+                    } else {
+                        console.log("❌ Données utilisateur non trouvées");
+                        updateBalanceDisplay(0);
+                    }
+                }, (error) => {
+                    console.error("❌ Erreur lors de la récupération du solde:", error);
+                    updateBalanceDisplay("Erreur de chargement");
+                });
+
+                // Observer aussi les transactions pour un feedback immédiat
+                const transactionsRef = ref(database, 'transactions');
+                onValue(transactionsRef, (snapshot) => {
+                    if (snapshot.exists()) {
+                        const transactions = snapshot.val();
+                        
+                        // Compter les transactions réussies de l'utilisateur
+                        const userSuccessfulTransactions = Object.values(transactions).filter(
+                            transaction => transaction.userId === user.uid && 
+                                          transaction.status === 'success' && 
+                                          transaction.credited === true
+                        ).length;
+                        
+                        // Afficher le nombre de recharges réussies (optionnel)
+                        const rechargesElement = document.getElementById("recharges-count");
+                        if (rechargesElement) {
+                            rechargesElement.textContent = userSuccessfulTransactions;
+                        }
                     }
                 });
+                
             } else {
                 // Utilisateur non connecté
+                console.log("❌ Utilisateur non connecté");
+                
                 const balanceElement = document.getElementById("balance");
-                if (balanceElement) balanceElement.innerText = "Veuillez vous connecter";
+                if (balanceElement) balanceElement.textContent = "Veuillez vous connecter";
                 
                 const emailElement = document.getElementById("email");
-                if (emailElement) emailElement.innerText = "Non connecté";
+                if (emailElement) emailElement.textContent = "Non connecté";
+                
+                const commissionElement = document.getElementById("commission");
+                if (commissionElement) commissionElement.textContent = "0 FCFA";
             }
         });
 
         // Fonction pour créer un compte utilisateur
         window.createAccount = async function(email, password) {
             try {
-                await createUserWithEmailAndPassword(auth, email, password);
+                console.log(`📝 Création de compte pour: ${email}`);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                console.log("✅ Compte créé avec succès");
+                return userCredential;
             } catch (error) {
-                console.error("Erreur lors de la création du compte:", error);
+                console.error("❌ Erreur lors de la création du compte:", error);
                 throw error;
             }
         }
+
+        // Fonction utilitaire pour rafraîchir manuellement le solde (si nécessaire)
+        window.refreshBalance = function() {
+            const user = auth.currentUser;
+            if (user) {
+                console.log("🔄 Rafraîchissement manuel du solde...");
+                // Le listener onValue se déclenchera automatiquement
+            } else {
+                console.log("❌ Aucun utilisateur connecté pour rafraîchir le solde");
+            }
+        }
+
+        console.log("🚀 Script de gestion des soldes initialisé");
     </script>
 </body>
 </html>
