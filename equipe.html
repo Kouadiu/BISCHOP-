@@ -65,6 +65,47 @@
         .copyable:hover .copy-icon {
             opacity: 1;
         }
+
+        .claim-button {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+            width: 100%;
+            margin-top: 12px;
+        }
+
+        .claim-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+        }
+
+        .claim-button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .claim-button:active {
+            transform: translateY(0);
+        }
+
+        .pulse-animation {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+            50% { box-shadow: 0 8px 20px rgba(16, 185, 129, 0.6); }
+            100% { box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3); }
+        }
     </style>
 </head>
 <body>
@@ -90,9 +131,10 @@
 
             <div class="stat-card p-6">
                 <div class="flex items-center justify-between">
-                    <div>
+                    <div class="flex-1">
                         <p class="text-sm font-medium text-gray-600 mb-1">Bonus de Parrainage</p>
                         <p id="commissionBalance" class="text-3xl font-bold text-emerald-600">0 FCFA</p>
+                        <p class="text-xs text-gray-500 mt-1">Disponible à récupérer</p>
                     </div>
                     <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
                         <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -100,6 +142,9 @@
                         </svg>
                     </div>
                 </div>
+                <button id="claimButton" class="claim-button" disabled>
+                    <span id="claimButtonText">Aucun bonus à récupérer</span>
+                </button>
             </div>
 
             <div class="stat-card p-6">
@@ -139,7 +184,7 @@
 <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-    import { getDatabase, ref, get, onValue, update, push } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getDatabase, ref, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
     // Configuration Firebase
     const firebaseConfig = {
@@ -156,52 +201,46 @@
     const auth = getAuth(app);
     const database = getDatabase(app);
 
-    // Variables pour suivre l'état et éviter les doubles crédits
-    let lastCommissionBalance = null;
-    let processedBonuses = new Set(); // Pour suivre les bonus déjà traités
-    let isInitialized = false;
-    let lastProcessedAmount = 0; // NOUVEAU: pour éviter de retraiter le même montant
+    // Variables globales
+    let currentUser = null;
+    let currentCommissionBalance = 0;
 
-    // Fonction pour afficher une notification de bonus
-    function showBonusNotification(amount, reason = "Bonus de parrainage") {
+    // Fonction pour afficher une notification de succès
+    function showSuccessNotification(message) {
         const notification = document.createElement('div');
         notification.style.cssText = `
             position: fixed;
             top: 20px;
             right: 20px;
-            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            background: linear-gradient(135deg, #10b981, #059669);
             color: white;
             padding: 15px 20px;
             border-radius: 8px;
-            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
             z-index: 1000;
             font-weight: bold;
-            animation: slideInBonus 0.3s ease, fadeOutBonus 0.3s ease 4.7s;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
             min-width: 280px;
             text-align: center;
         `;
         
         notification.innerHTML = `
             <div style="display: flex; align-items: center; gap: 10px;">
-                <span style="font-size: 24px;">🎉</span>
-                <div>
-                    <div style="font-size: 16px;">${reason}</div>
-                    <div style="font-size: 18px; font-weight: bold;">+${parseFloat(amount).toLocaleString('fr-FR')} FCFA</div>
-                    <div style="font-size: 12px; opacity: 0.9;">Ajouté à votre solde principal</div>
-                </div>
+                <span style="font-size: 24px;">✅</span>
+                <div>${message}</div>
             </div>
         `;
         
-        // Ajouter les animations CSS pour les bonus
-        if (!document.getElementById('bonus-notification-styles')) {
+        // Ajouter les animations CSS
+        if (!document.getElementById('notification-styles')) {
             const style = document.createElement('style');
-            style.id = 'bonus-notification-styles';
+            style.id = 'notification-styles';
             style.textContent = `
-                @keyframes slideInBonus {
+                @keyframes slideIn {
                     from { transform: translateX(100%) scale(0.8); opacity: 0; }
                     to { transform: translateX(0) scale(1); opacity: 1; }
                 }
-                @keyframes fadeOutBonus {
+                @keyframes fadeOut {
                     from { opacity: 1; transform: scale(1); }
                     to { opacity: 0; transform: scale(0.9); }
                 }
@@ -211,7 +250,6 @@
         
         document.body.appendChild(notification);
         
-        // Supprimer la notification après 5 secondes
         setTimeout(() => {
             if (notification.parentNode) {
                 notification.parentNode.removeChild(notification);
@@ -219,122 +257,110 @@
         }, 5000);
     }
 
-    // FONCTION CORRIGÉE pour ajouter SEULEMENT le nouveau bonus au solde
-    async function addNewCommissionToBalance(userId, newCommissionAmount) {
-        try {
-            console.log(`🔍 Traitement du nouveau bonus: ${newCommissionAmount} FCFA`);
-            
-            // Générer un ID unique pour ce bonus basé sur le timestamp et le montant exact
-            const bonusId = `commission_${Date.now()}_${newCommissionAmount}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Vérifier si exactement ce montant a déjà été traité récemment (dans les 10 dernières secondes)
-            if (lastProcessedAmount === newCommissionAmount) {
-                console.log(`⚠️ Même montant déjà traité récemment, ignoré: ${newCommissionAmount} FCFA`);
-                return false;
+    // Fonction pour afficher une notification d'erreur
+    function showErrorNotification(message) {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+            z-index: 1000;
+            font-weight: bold;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
+            min-width: 280px;
+            text-align: center;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">❌</span>
+                <div>${message}</div>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
             }
+        }, 5000);
+    }
 
-            const userRef = ref(database, 'users/' + userId);
+    // Fonction pour transférer les bonus vers le solde principal
+    async function claimCommissionBonus() {
+        if (!currentUser || currentCommissionBalance <= 0) {
+            return;
+        }
+
+        const claimButton = document.getElementById('claimButton');
+        const claimButtonText = document.getElementById('claimButtonText');
+        
+        // Désactiver le bouton pendant le traitement
+        claimButton.disabled = true;
+        claimButtonText.textContent = 'Traitement en cours...';
+
+        try {
+            const userRef = ref(database, 'users/' + currentUser.uid);
             const snapshot = await get(userRef);
             
             if (snapshot.exists()) {
                 const userData = snapshot.val();
-                
-                // Récupérer le solde principal actuel
                 const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                const commissionToTransfer = currentCommissionBalance;
                 
-                console.log(`💰 Solde actuel: ${currentBalance} FCFA`);
-                console.log(`💰 Nouveau bonus à ajouter: ${newCommissionAmount} FCFA`);
+                // Calculer le nouveau solde
+                const newBalance = currentBalance + commissionToTransfer;
                 
-                // CALCULER LE NOUVEAU SOLDE (solde actuel + SEULEMENT le nouveau bonus)
-                const newBalance = currentBalance + newCommissionAmount;
-                
-                console.log(`💰 Nouveau solde calculé: ${newBalance} FCFA`);
-                
-                // Mettre à jour la base de données avec le nouveau solde
+                // Mettre à jour la base de données
                 const updates = {
                     balance: newBalance,
-                    solde: newBalance, // Maintenir la synchronisation
-                    lastBonusReceived: new Date().toISOString(),
-                    totalBonusReceived: (userData.totalBonusReceived || 0) + newCommissionAmount,
-                    // NE PAS TOUCHER À commissionBalance ici - il sera géré séparément
-                    [`processedBonuses/${bonusId}`]: {
-                        amount: newCommissionAmount,
-                        reason: "Nouvelle commission de parrainage",
-                        processedAt: new Date().toISOString(),
-                        timestamp: Date.now()
-                    }
+                    solde: newBalance,
+                    commissionBalance: 0, // Remettre à zéro les bonus
+                    lastClaimedAt: new Date().toISOString(),
+                    totalClaimed: (userData.totalClaimed || 0) + commissionToTransfer
                 };
                 
                 await update(userRef, updates);
                 
-                // Enregistrer le montant traité pour éviter les doublons immédiats
-                lastProcessedAmount = newCommissionAmount;
+                // Afficher la notification de succès
+                showSuccessNotification(`${commissionToTransfer.toLocaleString('fr-FR')} FCFA ajoutés à votre solde !`);
                 
-                // Réinitialiser après 10 secondes
-                setTimeout(() => {
-                    lastProcessedAmount = 0;
-                }, 10000);
-                
-                // Afficher la notification
-                showBonusNotification(newCommissionAmount, "Nouvelle commission reçue");
-                
-                console.log(`✅ Bonus ajouté avec succès: ${newCommissionAmount} FCFA`);
+                console.log(`✅ Bonus récupéré avec succès: ${commissionToTransfer} FCFA`);
                 console.log(`✅ Nouveau solde: ${newBalance} FCFA`);
                 
-                return true;
+            } else {
+                throw new Error('Données utilisateur non trouvées');
             }
-            return false;
-        } catch (error) {
-            console.error("❌ Erreur lors de l'ajout du bonus au solde:", error);
-            return false;
-        }
-    }
-
-    // Fonction pour enregistrer un bonus traité
-    async function recordProcessedBonus(userId, bonusId, amount, reason) {
-        try {
-            const processedBonusRef = ref(database, `users/${userId}/processedBonuses/${bonusId}`);
-            await update(processedBonusRef, {
-                amount: amount,
-                reason: reason,
-                processedAt: new Date().toISOString(),
-                timestamp: Date.now()
-            });
-            return true;
-        } catch (error) {
-            console.error("❌ Erreur lors de l'enregistrement du bonus traité:", error);
-            return false;
-        }
-    }
-
-    // Fonction pour vérifier si un bonus a déjà été traité
-    async function isBonusAlreadyProcessed(userId, bonusId) {
-        try {
-            const processedBonusRef = ref(database, `users/${userId}/processedBonuses/${bonusId}`);
-            const snapshot = await get(processedBonusRef);
-            return snapshot.exists();
-        } catch (error) {
-            console.error("❌ Erreur lors de la vérification du bonus:", error);
-            return false;
-        }
-    }
-
-    // Fonction pour charger les bonus déjà traités
-    async function loadProcessedBonuses(userId) {
-        try {
-            const processedBonusesRef = ref(database, `users/${userId}/processedBonuses`);
-            const snapshot = await get(processedBonusesRef);
             
-            if (snapshot.exists()) {
-                const bonuses = snapshot.val();
-                processedBonuses.clear();
-                Object.keys(bonuses).forEach(bonusId => {
-                    processedBonuses.add(bonusId);
-                });
-                console.log(`📋 ${processedBonuses.size} bonus déjà traités chargés`);
-            }
         } catch (error) {
-            console.error("❌ Erreur lors du chargement des bonus traités:", error);
+            console.error("❌ Erreur lors de la récupération du bonus:", error);
+            showErrorNotification('Erreur lors de la récupération du bonus');
+            
+            // Réactiver le bouton en cas d'erreur
+            claimButton.disabled = false;
+            updateClaimButton();
+        }
+    }
+
+    // Fonction pour mettre à jour l'état du bouton
+    function updateClaimButton() {
+        const claimButton = document.getElementById('claimButton');
+        const claimButtonText = document.getElementById('claimButtonText');
+        
+        if (currentCommissionBalance > 0) {
+            claimButton.disabled = false;
+            claimButton.classList.add('pulse-animation');
+            claimButtonText.textContent = `Récupérer ${currentCommissionBalance.toLocaleString('fr-FR')} FCFA`;
+        } else {
+            claimButton.disabled = true;
+            claimButton.classList.remove('pulse-animation');
+            claimButtonText.textContent = 'Aucun bonus à récupérer';
         }
     }
 
@@ -361,52 +387,23 @@
         }
     }
 
+    // Écouter les changements d'authentification
     onAuthStateChanged(auth, async (user) => {
         if (user) {
+            currentUser = user;
+            
             try {
-                // Charger les bonus déjà traités
-                await loadProcessedBonuses(user.uid);
-                
                 const userRef = ref(database, 'users/' + user.uid);
                 
-                // Écouter les changements en temps réel pour la commission
+                // Écouter les changements en temps réel
                 onValue(userRef, async (snapshot) => {
                     if (snapshot.exists()) {
                         const userData = snapshot.val();
                         const referralCode = userData.userReferralCode;
                         const commissionBalance = userData.commissionBalance || 0;
 
-                        console.log(`🔍 Commission actuelle: ${commissionBalance} FCFA`);
-                        console.log(`🔍 Dernière commission connue: ${lastCommissionBalance} FCFA`);
-                        console.log(`🔍 Initialisé: ${isInitialized}`);
-
-                        // DÉTECTION D'AUGMENTATION DE COMMISSION (seulement après l'initialisation)
-                        if (isInitialized && commissionBalance > 0 && (lastCommissionBalance === null || commissionBalance !== lastCommissionBalance)) {
-                            
-                            if (lastCommissionBalance === null) {
-                                // Première détection - ne traiter que si c'est une vraie nouvelle commission
-                                console.log(`🔄 Première détection de commission: ${commissionBalance} FCFA`);
-                            } else {
-                                // Augmentation détectée
-                                const newCommission = commissionBalance - lastCommissionBalance;
-                                
-                                if (newCommission > 0) {
-                                    console.log(`🎯 Nouvelle commission détectée: ${newCommission} FCFA`);
-                                    
-                                    // Ajouter SEULEMENT le nouveau montant au solde
-                                    await addNewCommissionToBalance(user.uid, newCommission);
-                                }
-                            }
-                        }
-                        
-                        // Mettre à jour la dernière valeur connue
-                        lastCommissionBalance = commissionBalance;
-                        
-                        // Marquer comme initialisé après la première lecture
-                        if (!isInitialized) {
-                            isInitialized = true;
-                            console.log(`🔄 Initialisation terminée. Commission actuelle: ${commissionBalance} FCFA`);
-                        }
+                        // Mettre à jour la variable globale
+                        currentCommissionBalance = commissionBalance;
 
                         // Mettre à jour l'affichage
                         const referralCodeElement = document.getElementById("referralCode");
@@ -418,6 +415,9 @@
                         if (commissionBalanceElement) {
                             commissionBalanceElement.innerText = `${commissionBalance.toLocaleString('fr-FR')} FCFA`;
                         }
+
+                        // Mettre à jour le bouton
+                        updateClaimButton();
 
                         // Générer le lien de parrainage
                         const referralLinkElement = document.getElementById("referralLink");
@@ -431,12 +431,6 @@
                         const referralCountElement = document.getElementById("referralCount");
                         if (referralCountElement) {
                             referralCountElement.innerText = referralCount;
-                        }
-
-                        // Afficher le total des bonus reçus
-                        const totalBonusElement = document.getElementById("totalBonusReceived");
-                        if (totalBonusElement && userData.totalBonusReceived) {
-                            totalBonusElement.innerText = `${userData.totalBonusReceived.toLocaleString('fr-FR')} FCFA`;
                         }
                         
                     } else {
@@ -464,65 +458,15 @@
         }
     });
 
-    // Fonction pour afficher l'historique des commissions
-    function displayCommissionHistory(user) {
-        const commissionHistoryRef = ref(database, `commissionHistory/${user.uid}`);
-        
-        onValue(commissionHistoryRef, (snapshot) => {
-            const historyContainer = document.getElementById("commissionHistory");
-            if (!historyContainer) return;
-
-            if (snapshot.exists()) {
-                const history = snapshot.val();
-                let historyHTML = '<h3>Historique des Commissions</h3>';
-                
-                // Convertir en tableau et trier par date
-                const historyArray = Object.values(history).sort((a, b) => 
-                    new Date(b.date) - new Date(a.date)
-                );
-                
-                historyArray.forEach(commission => {
-                    const date = new Date(commission.date).toLocaleDateString('fr-FR');
-                    historyHTML += `
-                        <div class="commission-item" style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 5px;">
-                            <div><strong>Commission: ${commission.amount} FCFA</strong></div>
-                            <div>Recharge: ${commission.rechargeAmount} FCFA</div>
-                            <div>Date: ${date}</div>
-                            <div>Transaction: ${commission.transactionId}</div>
-                            <div style="color: #28a745; font-size: 12px;"><em>✅ Automatiquement ajouté au solde</em></div>
-                        </div>
-                    `;
-                });
-                
-                historyContainer.innerHTML = historyHTML;
-            } else {
-                historyContainer.innerHTML = '<div>Aucune commission reçue pour le moment</div>';
-            }
-        });
-    }
-
-    // Ajouter l'affichage de l'historique si l'utilisateur est connecté
-    onAuthStateChanged(auth, (user) => {
-        if (user) {
-            displayCommissionHistory(user);
-        }
-    });
-
-    // Fonction de debug pour vérifier les valeurs
-    window.debugCommissionValues = function() {
-        const user = auth.currentUser;
-        if (user) {
-            console.log("=== DEBUG COMMISSION ===");
-            console.log(`Utilisateur: ${user.uid}`);
-            console.log(`Dernière commission connue: ${lastCommissionBalance}`);
-            console.log(`Initialisé: ${isInitialized}`);
-            console.log(`Dernier montant traité: ${lastProcessedAmount}`);
-            console.log("========================");
-        }
-    };
-
-    // Copier le code de parrainage
+    // Événements DOM
     document.addEventListener('DOMContentLoaded', () => {
+        // Bouton de récupération des bonus
+        const claimButton = document.getElementById('claimButton');
+        if (claimButton) {
+            claimButton.addEventListener('click', claimCommissionBonus);
+        }
+
+        // Copier le code de parrainage
         const referralCodeElement = document.getElementById("referralCode");
         if (referralCodeElement) {
             referralCodeElement.onclick = function() {
@@ -561,7 +505,7 @@
         }
     });
 
-    console.log("🚀 Script de parrainage avec protection anti-doublon CORRIGÉ initialisé");
+    console.log("🚀 Script de parrainage avec récupération manuelle initialisé");
 </script>
 </body>
 </html>
