@@ -160,6 +160,7 @@
     let lastCommissionBalance = null;
     let processedBonuses = new Set(); // Pour suivre les bonus déjà traités
     let isInitialized = false;
+    let lastProcessedAmount = 0; // NOUVEAU: pour éviter de retraiter le même montant
 
     // Fonction pour afficher une notification de bonus
     function showBonusNotification(amount, reason = "Bonus de parrainage") {
@@ -218,6 +219,77 @@
         }, 5000);
     }
 
+    // FONCTION CORRIGÉE pour ajouter SEULEMENT le nouveau bonus au solde
+    async function addNewCommissionToBalance(userId, newCommissionAmount) {
+        try {
+            console.log(`🔍 Traitement du nouveau bonus: ${newCommissionAmount} FCFA`);
+            
+            // Générer un ID unique pour ce bonus basé sur le timestamp et le montant exact
+            const bonusId = `commission_${Date.now()}_${newCommissionAmount}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            // Vérifier si exactement ce montant a déjà été traité récemment (dans les 10 dernières secondes)
+            if (lastProcessedAmount === newCommissionAmount) {
+                console.log(`⚠️ Même montant déjà traité récemment, ignoré: ${newCommissionAmount} FCFA`);
+                return false;
+            }
+
+            const userRef = ref(database, 'users/' + userId);
+            const snapshot = await get(userRef);
+            
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                
+                // Récupérer le solde principal actuel
+                const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                
+                console.log(`💰 Solde actuel: ${currentBalance} FCFA`);
+                console.log(`💰 Nouveau bonus à ajouter: ${newCommissionAmount} FCFA`);
+                
+                // CALCULER LE NOUVEAU SOLDE (solde actuel + SEULEMENT le nouveau bonus)
+                const newBalance = currentBalance + newCommissionAmount;
+                
+                console.log(`💰 Nouveau solde calculé: ${newBalance} FCFA`);
+                
+                // Mettre à jour la base de données avec le nouveau solde
+                const updates = {
+                    balance: newBalance,
+                    solde: newBalance, // Maintenir la synchronisation
+                    lastBonusReceived: new Date().toISOString(),
+                    totalBonusReceived: (userData.totalBonusReceived || 0) + newCommissionAmount,
+                    // NE PAS TOUCHER À commissionBalance ici - il sera géré séparément
+                    [`processedBonuses/${bonusId}`]: {
+                        amount: newCommissionAmount,
+                        reason: "Nouvelle commission de parrainage",
+                        processedAt: new Date().toISOString(),
+                        timestamp: Date.now()
+                    }
+                };
+                
+                await update(userRef, updates);
+                
+                // Enregistrer le montant traité pour éviter les doublons immédiats
+                lastProcessedAmount = newCommissionAmount;
+                
+                // Réinitialiser après 10 secondes
+                setTimeout(() => {
+                    lastProcessedAmount = 0;
+                }, 10000);
+                
+                // Afficher la notification
+                showBonusNotification(newCommissionAmount, "Nouvelle commission reçue");
+                
+                console.log(`✅ Bonus ajouté avec succès: ${newCommissionAmount} FCFA`);
+                console.log(`✅ Nouveau solde: ${newBalance} FCFA`);
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error("❌ Erreur lors de l'ajout du bonus au solde:", error);
+            return false;
+        }
+    }
+
     // Fonction pour enregistrer un bonus traité
     async function recordProcessedBonus(userId, bonusId, amount, reason) {
         try {
@@ -266,123 +338,6 @@
         }
     }
 
-    // Fonction pour ajouter automatiquement les bonus au solde avec protection contre les doublons
-    async function addBonusToBalance(userId, bonusAmount, reason = "Bonus de parrainage") {
-        try {
-            // Générer un ID unique pour ce bonus basé sur le timestamp et le montant
-            const bonusId = `bonus_${Date.now()}_${bonusAmount}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            // Vérifier si ce bonus a déjà été traité
-            if (await isBonusAlreadyProcessed(userId, bonusId) || processedBonuses.has(bonusId)) {
-                console.log(`⚠️ Bonus déjà traité, ignoré: ${bonusAmount} FCFA`);
-                return false;
-            }
-
-            const userRef = ref(database, 'users/' + userId);
-            const snapshot = await get(userRef);
-            
-            if (snapshot.exists()) {
-                const userData = snapshot.val();
-                
-                // Récupérer le solde principal (priorité à 'solde', puis 'balance')
-                const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
-                
-                // Calculer le nouveau solde
-                const newBalance = currentBalance + bonusAmount;
-                
-                // Mettre à jour la base de données avec le nouveau solde ET enregistrer le bonus traité
-                const updates = {
-                    balance: newBalance,
-                    solde: newBalance, // Maintenir la synchronisation
-                    lastBonusReceived: new Date().toISOString(),
-                    totalBonusReceived: (userData.totalBonusReceived || 0) + bonusAmount,
-                    [`processedBonuses/${bonusId}`]: {
-                        amount: bonusAmount,
-                        reason: reason,
-                        processedAt: new Date().toISOString(),
-                        timestamp: Date.now()
-                    }
-                };
-                
-                await update(userRef, updates);
-                
-                // Ajouter à notre cache local
-                processedBonuses.add(bonusId);
-                
-                // Afficher la notification
-                showBonusNotification(bonusAmount, reason);
-                
-                console.log(`🎉 Bonus ajouté avec succès: ${bonusAmount} FCFA (ID: ${bonusId})`);
-                
-                return true;
-            }
-            return false;
-        } catch (error) {
-            console.error("❌ Erreur lors de l'ajout du bonus au solde:", error);
-            return false;
-        }
-    }
-
-    // Fonction pour transférer le bonus de commission vers le solde principal
-    async function transferCommissionToBalance(userId) {
-        try {
-            const userRef = ref(database, 'users/' + userId);
-            const snapshot = await get(userRef);
-            
-            if (snapshot.exists()) {
-                const userData = snapshot.val();
-                const commissionBalance = userData.commissionBalance || 0;
-                
-                if (commissionBalance > 0) {
-                    // Créer un ID unique pour ce transfert
-                    const transferId = `transfer_${Date.now()}_${commissionBalance}`;
-                    
-                    // Vérifier si ce transfert a déjà été effectué
-                    if (await isBonusAlreadyProcessed(userId, transferId)) {
-                        console.log(`⚠️ Transfert déjà effectué, ignoré: ${commissionBalance} FCFA`);
-                        return false;
-                    }
-
-                    // Récupérer le solde principal (priorité à 'solde', puis 'balance')
-                    const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
-                    
-                    // Calculer le nouveau solde
-                    const newBalance = currentBalance + commissionBalance;
-                    
-                    // Mettre à jour la base de données
-                    const updates = {
-                        balance: newBalance,
-                        solde: newBalance, // Maintenir la synchronisation
-                        commissionBalance: 0, // Remettre à zéro les commissions
-                        lastBonusTransfer: new Date().toISOString(),
-                        [`processedBonuses/${transferId}`]: {
-                            amount: commissionBalance,
-                            reason: "Transfert commission vers solde",
-                            processedAt: new Date().toISOString(),
-                            timestamp: Date.now()
-                        }
-                    };
-                    
-                    await update(userRef, updates);
-                    
-                    // Ajouter à notre cache local
-                    processedBonuses.add(transferId);
-                    
-                    // Afficher la notification
-                    showBonusNotification(commissionBalance, "Bonus de parrainage transféré");
-                    
-                    console.log(`💰 Bonus transféré avec succès: ${commissionBalance} FCFA`);
-                    
-                    return true;
-                }
-            }
-            return false;
-        } catch (error) {
-            console.error("❌ Erreur lors du transfert du bonus:", error);
-            return false;
-        }
-    }
-
     // Fonction pour compter les filleuls
     async function countReferrals(referralCode) {
         try {
@@ -421,13 +376,27 @@
                         const referralCode = userData.userReferralCode;
                         const commissionBalance = userData.commissionBalance || 0;
 
+                        console.log(`🔍 Commission actuelle: ${commissionBalance} FCFA`);
+                        console.log(`🔍 Dernière commission connue: ${lastCommissionBalance} FCFA`);
+                        console.log(`🔍 Initialisé: ${isInitialized}`);
+
                         // DÉTECTION D'AUGMENTATION DE COMMISSION (seulement après l'initialisation)
-                        if (isInitialized && commissionBalance > lastCommissionBalance && lastCommissionBalance !== null) {
-                            const bonusReceived = commissionBalance - lastCommissionBalance;
-                            console.log(`🎯 Nouvelle commission détectée: ${bonusReceived} FCFA`);
+                        if (isInitialized && commissionBalance > 0 && (lastCommissionBalance === null || commissionBalance !== lastCommissionBalance)) {
                             
-                            // Ajouter directement au solde principal avec protection contre les doublons
-                            await addBonusToBalance(user.uid, bonusReceived, "Nouvelle commission de parrainage");
+                            if (lastCommissionBalance === null) {
+                                // Première détection - ne traiter que si c'est une vraie nouvelle commission
+                                console.log(`🔄 Première détection de commission: ${commissionBalance} FCFA`);
+                            } else {
+                                // Augmentation détectée
+                                const newCommission = commissionBalance - lastCommissionBalance;
+                                
+                                if (newCommission > 0) {
+                                    console.log(`🎯 Nouvelle commission détectée: ${newCommission} FCFA`);
+                                    
+                                    // Ajouter SEULEMENT le nouveau montant au solde
+                                    await addNewCommissionToBalance(user.uid, newCommission);
+                                }
+                            }
                         }
                         
                         // Mettre à jour la dernière valeur connue
@@ -495,7 +464,7 @@
         }
     });
 
-    // Fonction pour afficher l'historique des commissions avec informations sur les transferts
+    // Fonction pour afficher l'historique des commissions
     function displayCommissionHistory(user) {
         const commissionHistoryRef = ref(database, `commissionHistory/${user.uid}`);
         
@@ -520,7 +489,7 @@
                             <div>Recharge: ${commission.rechargeAmount} FCFA</div>
                             <div>Date: ${date}</div>
                             <div>Transaction: ${commission.transactionId}</div>
-                            <div style="color: #28a745; font-size: 12px;"><em>✅ Automatiquement ajouté au solde (sans doublon)</em></div>
+                            <div style="color: #28a745; font-size: 12px;"><em>✅ Automatiquement ajouté au solde</em></div>
                         </div>
                     `;
                 });
@@ -539,46 +508,16 @@
         }
     });
 
-    // Fonction publique pour transférer manuellement les commissions (bouton optionnel)
-    window.transferBonusToBalance = async function() {
+    // Fonction de debug pour vérifier les valeurs
+    window.debugCommissionValues = function() {
         const user = auth.currentUser;
         if (user) {
-            const success = await transferCommissionToBalance(user.uid);
-            if (success) {
-                alert("Bonus transféré avec succès vers votre solde principal !");
-            } else {
-                alert("Aucun bonus à transférer, déjà transféré, ou erreur lors du transfert.");
-            }
-        } else {
-            alert("Veuillez vous connecter.");
-        }
-    };
-
-    // Fonction pour nettoyer les anciens bonus traités (optionnel, à exécuter périodiquement)
-    window.cleanOldProcessedBonuses = async function(daysOld = 30) {
-        const user = auth.currentUser;
-        if (user) {
-            try {
-                const processedBonusesRef = ref(database, `users/${user.uid}/processedBonuses`);
-                const snapshot = await get(processedBonusesRef);
-                
-                if (snapshot.exists()) {
-                    const bonuses = snapshot.val();
-                    const cutoffDate = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
-                    let deletedCount = 0;
-                    
-                    for (const [bonusId, bonus] of Object.entries(bonuses)) {
-                        if (bonus.timestamp && bonus.timestamp < cutoffDate) {
-                            await update(ref(database, `users/${user.uid}/processedBonuses/${bonusId}`), null);
-                            deletedCount++;
-                        }
-                    }
-                    
-                    console.log(`🧹 ${deletedCount} anciens bonus traités supprimés`);
-                }
-            } catch (error) {
-                console.error("❌ Erreur lors du nettoyage:", error);
-            }
+            console.log("=== DEBUG COMMISSION ===");
+            console.log(`Utilisateur: ${user.uid}`);
+            console.log(`Dernière commission connue: ${lastCommissionBalance}`);
+            console.log(`Initialisé: ${isInitialized}`);
+            console.log(`Dernier montant traité: ${lastProcessedAmount}`);
+            console.log("========================");
         }
     };
 
@@ -622,7 +561,7 @@
         }
     });
 
-    console.log("🚀 Script de parrainage avec protection anti-doublon initialisé");
+    console.log("🚀 Script de parrainage avec protection anti-doublon CORRIGÉ initialisé");
 </script>
 </body>
 </html>
