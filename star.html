@@ -7,7 +7,7 @@
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            background: linear-gradient(135deg, #ffffff 0%, #ffffff 100%);
             font-family: 'Inter', sans-serif;
         }
         .card {
@@ -19,7 +19,7 @@
             box-shadow: 0 15px 35px rgba(0,0,0,0.15);
         }
         .btn-primary {
-            background: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
+            background: linear-gradient(to right, #6a11cb 0%, #0a0091 100%);
             transition: all 0.3s ease;
         }
         .btn-primary:hover {
@@ -80,7 +80,7 @@
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Faire une Mise</h2>
                 <div class="space-y-4">
                     <div class="text-center text-sm text-gray-600 mb-2">
-                        Minimum a déposé : 3 500 FCFA
+                        Minimum a déposé : 1 500 FCFA
                     </div>
                     <input 
                         type="number" 
@@ -93,14 +93,14 @@
                         onclick="miser()" 
                         class="w-full btn-primary text-white px-6 py-3 rounded-lg font-semibold"
                     >
-                        Déposez au Labo
+                        Déposez 
                     </button>
                 </div>
             </div>
 
             <div class="bg-white rounded-lg p-6 shadow-md">
                 <h2 class="text-xl font-semibold mb-4 text-gray-800">Réclamation</h2>
-                <p class="text-gray-600 mb-4">Récupérez 10% de votre somme déposer jusqu'à 1 ans</p>
+                <p class="text-gray-600 mb-4">Récupérez 4% de votre somme déposer jusqu'à 62 jours</p>
                 <button 
                     onclick="togglePopup()" 
                     class="w-full bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-semibold transition"
@@ -138,7 +138,7 @@
     </div>
 
     <footer class="bg-gray-100 py-6 text-center">
-        <p class="text-gray-600">© 2024 GHOST GHOST. Tous droits réservés.</p>
+        <p class="text-gray-600">© 2024 BISCHOP BISCHOP. Tous droits réservés.</p>
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -204,191 +204,385 @@
             updateChart();
         }, 1000); // Mise à jour toutes les 1 seconde
     </script>
-    <script type="module">
+<script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { getAuth } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getDatabase, ref, get, update, onValue } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-const firebaseConfig = {
-    apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
-    authDomain: "paris-3df9f.firebaseapp.com",
-    databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
-    projectId: "paris-3df9f",
-    storageBucket: "paris-3df9f.appspot.com",
-    messagingSenderId: "365107415196",
-    appId: "1:365107415196:web:4c0021baec5a51a0f50559"
-};
+    const firebaseConfig = {
+        apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
+        authDomain: "paris-3df9f.firebaseapp.com",
+        databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
+        projectId: "paris-3df9f",
+        storageBucket: "paris-3df9f.appspot.com",
+        messagingSenderId: "365107415196",
+        appId: "1:365107415196:web:4c0021baec5a51a0f50559"
+    };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const database = getDatabase(app);
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const database = getDatabase(app);
 
-const MINIMUM_BET = 3500; // Montant minimum de mise
-let totalBets = 0;
-let cycleEndDate = null;
+    const MINIMUM_BET = 1500; // Montant minimum de mise
+    let totalBets = 0;
+    let cycleEndDate = null;
+    let currentBalance = 0;
 
-// Ajouter un attribut min à l'input pour la validation côté navigateur
-document.getElementById('betAmount').setAttribute('min', MINIMUM_BET);
-
-auth.onAuthStateChanged(async (user) => {
-    if (user) {
-        const userRef = ref(database, 'users/' + user.uid);
-        const snapshot = await get(userRef);
-        if (snapshot.exists()) {
-            const userData = snapshot.val();
-            document.getElementById("balance").innerText = userData.balance.toFixed(2) + " FCFA";
-            
-            // Gestion du cycle
-            if (userData.cycleEndDate) {
-                cycleEndDate = new Date(userData.cycleEndDate);
-                document.getElementById("cycleEnd").innerText = cycleEndDate.toLocaleDateString();
-            }
-
-            totalBets = userData.totalBets || 0;
-            document.getElementById("totalBets").innerText = totalBets.toFixed(2) + " FCFA";
-
-            // Afficher la dernière réclamation si elle existe
-            if (userData.lastClaim) {
-                const lastClaimDate = new Date(userData.lastClaim);
-                document.getElementById("lastClaim").innerText = "Dernière réclamation : " + lastClaimDate.toLocaleDateString();
-            }
+    // Ajouter un attribut min à l'input pour la validation côté navigateur
+    document.addEventListener('DOMContentLoaded', () => {
+        const betAmountInput = document.getElementById('betAmount');
+        if (betAmountInput) {
+            betAmountInput.setAttribute('min', MINIMUM_BET);
         }
-    }
-});
-
-// Fonction pour vérifier si le cycle est terminé
-function isCycleExpired() {
-    if (!cycleEndDate) return true;
-    return new Date() > cycleEndDate;
-}
-
-// Fonction pour réinitialiser le cycle
-function resetCycle() {
-    const newCycleEndDate = new Date();
-    // Définir la fin du cycle à 62 jours (2 mois) à partir d'aujourd'hui
-    newCycleEndDate.setDate(newCycleEndDate.getDate() + 62);
-    cycleEndDate = newCycleEndDate;
-    totalBets = 0; // Réinitialiser le total des mises
-    return newCycleEndDate;
-}
-
-// Fonction pour miser de l'argent
-window.miser = async function() {
-    const betAmount = parseFloat(document.getElementById("betAmount").value);
-    const user = auth.currentUser;
-
-    // Validation du montant de mise
-    if (!betAmount || isNaN(betAmount)) {
-        alert("Veuillez entrer un montant valide.");
-        return;
-    }
-
-    if (betAmount < MINIMUM_BET) {
-        alert(`Le montant minimum de mise est de ${MINIMUM_BET} FCFA.`);
-        return;
-    }
-
-    if (user) {
-        const userRef = ref(database, 'users/' + user.uid);
-        const snapshot = await get(userRef);
-
-        if (snapshot.exists()) {
-            const userData = snapshot.val();
-            const currentBalance = userData.balance;
-
-            // Vérifier et potentiellement réinitialiser le cycle
-            if (isCycleExpired()) {
-                const newCycleEnd = resetCycle();
-                document.getElementById("cycleEnd").innerText = newCycleEnd.toLocaleDateString();
-            }
-
-            if (currentBalance >= betAmount) {
-                const newTotalBets = totalBets + betAmount;
-                const newBalance = currentBalance - betAmount;
-
-                // Mettre à jour la base de données avec le nouveau cycle
-                await update(userRef, { 
-                    balance: newBalance, 
-                    totalBets: newTotalBets,
-                    cycleEndDate: cycleEndDate.toISOString(),
-                    lastBetDate: new Date().toISOString()
-                });
-
-                // Mise à jour des affichages
-                document.getElementById("balance").innerText = newBalance.toFixed(2) + " FCFA";
-                document.getElementById("totalBets").innerText = newTotalBets.toFixed(2) + " FCFA";
-                document.getElementById("betAmount").value = "";
-
-                alert(`Mise réussie de ${betAmount.toFixed(2)} FCFA. Montant minimum respecté. Cycle se termine le ${cycleEndDate.toLocaleDateString()}`);
-            } else {
-                alert("Solde insuffisant pour cette mise.");
-            }
-        }
-    } else {
-        alert("Veuillez vous connecter pour effectuer une mise.");
-    }
-};
-
-// Fonction de réclamation 
-window.reclamer = async function() {
-    const user = auth.currentUser;
-    if (user) {
-        const userRef = ref(database, 'users/' + user.uid);
-        const snapshot = await get(userRef);
-
-        if (snapshot.exists()) {
-            const userData = snapshot.val();
-            const currentBalance = userData.balance;
-            const lastClaimDate = userData.lastClaim ? new Date(userData.lastClaim) : null;
-            const today = new Date();
-
-            // Vérifie si une réclamation a été faite aujourd'hui
-            if (lastClaimDate && lastClaimDate.toDateString() === today.toDateString()) {
-                alert("Vous avez déjà réclamé aujourd'hui. Veuillez réessayer demain.");
-                return;
-            }
-
-            // Calculer le montant à réclamer (4% du total des mises)
-            const claimAmount = totalBets * 0.04;
-            const newBalance = currentBalance + claimAmount;
-
-            // Mettre à jour le solde et la date de réclamation dans la base de données
-            await update(userRef, { 
-                balance: newBalance, 
-                lastClaim: today.toISOString(), 
-                totalBets: totalBets 
-            });
-
-            // Afficher le nouveau solde sur la page, arrondi à deux décimales
-            document.getElementById("balance").innerText = newBalance.toFixed(2) + " FCFA";
-            
-            // Correction : Mettre à jour l'élément lastClaim
-            document.getElementById("lastClaim").innerText = "Dernière réclamation : " + today.toLocaleDateString();
-
-            // Masquer le popup après la réclamation
-            togglePopup();
-            alert("Réclamation réussie ! Votre nouveau solde est " + newBalance.toFixed(2) + " FCFA.");
-        }
-    } else {
-        alert("Veuillez vous connecter pour faire une réclamation.");
-    }
-};
-
-// Fonction de déconnexion
-window.deconnexion = function() {
-    auth.signOut().then(() => {
-        // Redirection vers la page de connexion
-        window.location.href = 'connexion.html';
-    }).catch((error) => {
-        console.error('Erreur de déconnexion :', error);
     });
-};
 
-// Autres fonctions utilitaires
-window.togglePopup = function() {
-    const popupSection = document.getElementById("popup-section");
-    popupSection.style.display = (popupSection.style.display === "flex") ? "none" : "flex";
-};
+    // Fonction pour formater et afficher le solde avec animation
+    function updateBalanceDisplay(balance, isUpdate = false) {
+        const balanceElement = document.getElementById("balance");
+        if (!balanceElement) return;
+        
+        const formattedBalance = `${parseFloat(balance).toLocaleString('fr-FR')} FCFA`;
+        
+        if (isUpdate) {
+            // Animation de mise à jour
+            balanceElement.style.transition = 'all 0.3s ease';
+            balanceElement.style.color = '#28a745'; // Vert pour indiquer une mise à jour
+            balanceElement.style.transform = 'scale(1.05)';
+            
+            setTimeout(() => {
+                balanceElement.style.color = '';
+                balanceElement.style.transform = 'scale(1)';
+            }, 1000);
+        }
+        
+        balanceElement.textContent = formattedBalance;
+        currentBalance = parseFloat(balance);
+    }
+
+    // Fonction pour afficher les notifications de crédit
+    function showCreditNotification(amount) {
+        // Créer une notification temporaire
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(40, 167, 69, 0.3);
+            z-index: 1000;
+            font-weight: bold;
+            animation: slideIn 0.3s ease, fadeOut 0.3s ease 2.7s;
+            min-width: 250px;
+            text-align: center;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">💰</span>
+                <div>
+                    <div>Recharge créditée !</div>
+                    <div style="font-size: 14px; opacity: 0.9;">+${parseFloat(amount).toLocaleString('fr-FR')} FCFA</div>
+                </div>
+            </div>
+        `;
+        
+        // Ajouter les animations CSS
+        if (!document.getElementById('credit-notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'credit-notification-styles';
+            style.textContent = `
+                @keyframes slideIn {
+                    from { transform: translateX(100%); opacity: 0; }
+                    to { transform: translateX(0); opacity: 1; }
+                }
+                @keyframes fadeOut {
+                    from { opacity: 1; }
+                    to { opacity: 0; }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Supprimer la notification après 3 secondes
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 3000);
+    }
+
+    // Fonction pour vérifier si le cycle est terminé
+    function isCycleExpired() {
+        if (!cycleEndDate) return true;
+        return new Date() > cycleEndDate;
+    }
+
+    // Fonction pour réinitialiser le cycle
+    function resetCycle() {
+        const newCycleEndDate = new Date();
+        // Définir la fin du cycle à 62 jours (2 mois) à partir d'aujourd'hui
+        newCycleEndDate.setDate(newCycleEndDate.getDate() + 62);
+        cycleEndDate = newCycleEndDate;
+        totalBets = 0; // Réinitialiser le total des mises
+        return newCycleEndDate;
+    }
+
+    // Observer l'état d'authentification avec gestion unifiée des soldes
+    onAuthStateChanged(auth, async (user) => {
+        if (user) {
+            console.log(`👤 Utilisateur connecté: ${user.uid}`);
+            
+            // Afficher l'email si l'élément existe
+            const emailElement = document.getElementById("email");
+            if (emailElement) emailElement.textContent = user.email;
+            
+            // Observer les changements de données utilisateur en temps réel
+            const userRef = ref(database, 'users/' + user.uid);
+            let previousBalance = null;
+            
+            onValue(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    console.log("🔍 Données utilisateur récupérées:", userData);
+                    
+                    // RÉCUPÉRATION DU SOLDE - Utiliser 'solde' en priorité, puis 'balance' comme fallback
+                    const balance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                    
+                    // Détecter si c'est une mise à jour (augmentation du solde)
+                    const isUpdate = previousBalance !== null && balance > previousBalance;
+                    
+                    // Si c'est une augmentation, afficher la notification
+                    if (isUpdate) {
+                        const difference = balance - previousBalance;
+                        console.log(`💰 Solde mis à jour: +${difference} FCFA (nouveau solde: ${balance} FCFA)`);
+                        showCreditNotification(difference);
+                    }
+                    
+                    // Mettre à jour l'affichage du solde
+                    updateBalanceDisplay(balance, isUpdate);
+                    
+                    // GESTION DU CYCLE
+                    if (userData.cycleEndDate) {
+                        cycleEndDate = new Date(userData.cycleEndDate);
+                        const cycleEndElement = document.getElementById("cycleEnd");
+                        if (cycleEndElement) {
+                            cycleEndElement.textContent = cycleEndDate.toLocaleDateString('fr-FR');
+                        }
+                    }
+
+                    // TOTAL DES MISES
+                    totalBets = userData.totalBets || 0;
+                    const totalBetsElement = document.getElementById("totalBets");
+                    if (totalBetsElement) {
+                        totalBetsElement.textContent = totalBets.toLocaleString('fr-FR') + " FCFA";
+                    }
+
+                    // DERNIÈRE RÉCLAMATION
+                    if (userData.lastClaim) {
+                        const lastClaimDate = new Date(userData.lastClaim);
+                        const lastClaimElement = document.getElementById("lastClaim");
+                        if (lastClaimElement) {
+                            lastClaimElement.textContent = "Dernière réclamation : " + lastClaimDate.toLocaleDateString('fr-FR');
+                        }
+                    }
+
+                    // COMMISSION (si elle existe)
+                    const commissionElement = document.getElementById("commission");
+                    if (commissionElement && userData.commissionBalance !== undefined) {
+                        commissionElement.textContent = `${parseFloat(userData.commissionBalance).toLocaleString('fr-FR')} FCFA`;
+                    }
+                    
+                    // Sauvegarder le solde actuel pour la prochaine comparaison
+                    previousBalance = balance;
+                    
+                    console.log(`💳 Solde actuel: ${balance} FCFA`);
+                    
+                } else {
+                    console.log("❌ Données utilisateur non trouvées - Création des données par défaut");
+                    
+                    // Créer des données par défaut si elles n'existent pas
+                    const defaultData = {
+                        email: user.email,
+                        balance: 0,
+                        solde: 0, // Ajouter les deux champs pour la compatibilité
+                        totalBets: 0,
+                        commissionBalance: 0,
+                        cycleEndDate: new Date().toISOString(),
+                        createdAt: new Date().toISOString()
+                    };
+                    
+                    update(userRef, defaultData).then(() => {
+                        console.log("✅ Données par défaut créées");
+                    }).catch((error) => {
+                        console.error("❌ Erreur lors de la création des données par défaut:", error);
+                    });
+                    
+                    updateBalanceDisplay(0);
+                }
+            }, (error) => {
+                console.error("❌ Erreur lors de la récupération des données:", error);
+                updateBalanceDisplay("Erreur de chargement");
+            });
+            
+        } else {
+            // Utilisateur non connecté
+            console.log("❌ Utilisateur non connecté");
+            
+            const balanceElement = document.getElementById("balance");
+            if (balanceElement) balanceElement.textContent = "Veuillez vous connecter";
+            
+            const emailElement = document.getElementById("email");
+            if (emailElement) emailElement.textContent = "Non connecté";
+        }
+    });
+
+    // Fonction pour miser de l'argent
+    window.miser = async function() {
+        const betAmount = parseFloat(document.getElementById("betAmount").value);
+        const user = auth.currentUser;
+
+        // Validation du montant de mise
+        if (!betAmount || isNaN(betAmount)) {
+            alert("Veuillez entrer un montant valide.");
+            return;
+        }
+
+        if (betAmount < MINIMUM_BET) {
+            alert(`Le montant minimum de mise est de ${MINIMUM_BET.toLocaleString('fr-FR')} FCFA.`);
+            return;
+        }
+
+        if (user) {
+            const userRef = ref(database, 'users/' + user.uid);
+            const snapshot = await get(userRef);
+
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                
+                // Utiliser le même système de récupération du solde
+                const currentUserBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+
+                // Vérifier et potentiellement réinitialiser le cycle
+                if (isCycleExpired()) {
+                    const newCycleEnd = resetCycle();
+                    const cycleEndElement = document.getElementById("cycleEnd");
+                    if (cycleEndElement) {
+                        cycleEndElement.textContent = newCycleEnd.toLocaleDateString('fr-FR');
+                    }
+                }
+
+                if (currentUserBalance >= betAmount) {
+                    const newTotalBets = totalBets + betAmount;
+                    const newBalance = currentUserBalance - betAmount;
+
+                    // Mettre à jour la base de données avec les deux champs pour la compatibilité
+                    const updates = {
+                        balance: newBalance,
+                        solde: newBalance, // Maintenir la synchronisation
+                        totalBets: newTotalBets,
+                        cycleEndDate: cycleEndDate.toISOString(),
+                        lastBetDate: new Date().toISOString()
+                    };
+
+                    await update(userRef, updates);
+
+                    // Vider le champ de saisie
+                    const betAmountInput = document.getElementById("betAmount");
+                    if (betAmountInput) betAmountInput.value = "";
+
+                    alert(`Mise réussie de ${betAmount.toLocaleString('fr-FR')} FCFA. Montant minimum respecté. Cycle se termine le ${cycleEndDate.toLocaleDateString('fr-FR')}`);
+                } else {
+                    alert("Solde insuffisant pour cette mise.");
+                }
+            }
+        } else {
+            alert("Veuillez vous connecter pour effectuer une mise.");
+        }
+    };
+
+    // Fonction de réclamation 
+    window.reclamer = async function() {
+        const user = auth.currentUser;
+        if (user) {
+            const userRef = ref(database, 'users/' + user.uid);
+            const snapshot = await get(userRef);
+
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                
+                // Utiliser le même système de récupération du solde
+                const currentUserBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                
+                const lastClaimDate = userData.lastClaim ? new Date(userData.lastClaim) : null;
+                const today = new Date();
+
+                // Vérifie si une réclamation a été faite aujourd'hui
+                if (lastClaimDate && lastClaimDate.toDateString() === today.toDateString()) {
+                    alert("Vous avez déjà réclamé aujourd'hui. Veuillez réessayer demain.");
+                    return;
+                }
+
+                // Calculer le montant à réclamer (4% du total des mises)
+                const claimAmount = totalBets * 0.04;
+                const newBalance = currentUserBalance + claimAmount;
+
+                // Mettre à jour le solde et la date de réclamation dans la base de données
+                const updates = {
+                    balance: newBalance,
+                    solde: newBalance, // Maintenir la synchronisation
+                    lastClaim: today.toISOString(),
+                    totalBets: totalBets
+                };
+
+                await update(userRef, updates);
+
+                // Masquer le popup après la réclamation
+                if (typeof togglePopup === 'function') {
+                    togglePopup();
+                }
+                
+                alert(`Réclamation réussie ! Votre nouveau solde est ${newBalance.toLocaleString('fr-FR')} FCFA.`);
+            }
+        } else {
+            alert("Veuillez vous connecter pour faire une réclamation.");
+        }
+    };
+
+    // Fonction de déconnexion
+    window.deconnexion = function() {
+        auth.signOut().then(() => {
+            // Redirection vers la page de connexion
+            window.location.href = 'connexion.html';
+        }).catch((error) => {
+            console.error('Erreur de déconnexion :', error);
+        });
+    };
+
+    // Fonction pour basculer le popup
+    window.togglePopup = function() {
+        const popupSection = document.getElementById("popup-section");
+        if (popupSection) {
+            popupSection.style.display = (popupSection.style.display === "flex") ? "none" : "flex";
+        }
+    };
+
+    // Fonction utilitaire pour rafraîchir manuellement le solde (si nécessaire)
+    window.refreshBalance = function() {
+        const user = auth.currentUser;
+        if (user) {
+            console.log("🔄 Rafraîchissement manuel du solde...");
+            // Le listener onValue se déclenchera automatiquement
+        } else {
+            console.log("❌ Aucun utilisateur connecté pour rafraîchir le solde");
+        }
+    };
+
+    console.log("🚀 Script de gestion unifié des soldes et mises initialisé");
 </script>
 </body>
 </html>
