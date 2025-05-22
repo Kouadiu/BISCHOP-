@@ -276,7 +276,7 @@ h1:hover i {
         <div id="historyList"></div>
     </div>
 
-    <script type="module">
+<script type="module">
         // Importations Firebase avec query et orderByChild
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
         import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
@@ -288,7 +288,8 @@ h1:hover i {
             onValue,
             query,
             orderByChild,
-            update 
+            update,
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
         const firebaseConfig = {
@@ -305,29 +306,167 @@ h1:hover i {
             const app = initializeApp(firebaseConfig);
             const auth = getAuth(app);
             const db = getDatabase(app);
-            const creditedTransactions = new Set();
 
-            async function updateUserBalance(userId, amount, transactionId) {
-                if (creditedTransactions.has(transactionId)) return;
-
+            // Fonction pour gérer la commission du parrain
+            async function creditSponsorCommission(userId, amount, transactionId) {
                 try {
+                    console.log(`🔄 Traitement commission pour transaction ${transactionId}`);
+                    
+                    // Récupérer les données de l'utilisateur qui recharge
+                    const userRef = ref(db, `users/${userId}`);
+                    const userSnapshot = await get(userRef);
+                    
+                    if (userSnapshot.exists()) {
+                        const userData = userSnapshot.val();
+                        const referralCodeUsed = userData.referralCodeUsed;
+                        
+                        // Si l'utilisateur a été parrainé
+                        if (referralCodeUsed) {
+                            console.log(`👥 Utilisateur parrainé avec le code: ${referralCodeUsed}`);
+                            
+                            // Trouver le parrain
+                            const allUsersRef = ref(db, 'users');
+                            const allUsersSnapshot = await get(allUsersRef);
+                            
+                            if (allUsersSnapshot.exists()) {
+                                const allUsers = allUsersSnapshot.val();
+                                
+                                // Chercher le parrain par son code de parrainage
+                                for (const sponsorId in allUsers) {
+                                    const sponsorData = allUsers[sponsorId];
+                                    
+                                    if (sponsorData.userReferralCode === referralCodeUsed) {
+                                        // Calculer la commission (10%)
+                                        const commission = parseFloat(amount) * 0.10;
+                                        const currentCommissionBalance = parseFloat(sponsorData.commissionBalance) || 0;
+                                        const newCommissionBalance = currentCommissionBalance + commission;
+                                        
+                                        // Mettre à jour la commission du parrain
+                                        await update(ref(db, `users/${sponsorId}`), {
+                                            commissionBalance: newCommissionBalance
+                                        });
+                                        
+                                        // Enregistrer l'historique de la commission
+                                        const commissionHistoryRef = ref(db, `commissionHistory/${sponsorId}/${transactionId}`);
+                                        await set(commissionHistoryRef, {
+                                            amount: commission,
+                                            fromUserId: userId,
+                                            rechargeAmount: parseFloat(amount),
+                                            date: new Date().toISOString(),
+                                            transactionId: transactionId,
+                                            processed: true
+                                        });
+                                        
+                                        console.log(`✅ Commission de ${commission} FCFA créditée au parrain ${sponsorId}`);
+                                        break;
+                                    }
+                                }
+                            }
+                        } else {
+                            console.log(`ℹ️ Utilisateur ${userId} non parrainé`);
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ Erreur lors du crédit de commission:', error);
+                }
+            }
+
+            // Fonction AMÉLIORÉE pour créditer automatiquement une transaction
+            async function updateUserBalance(userId, amount, transactionId) {
+                try {
+                    console.log(`💰 Début crédit pour transaction ${transactionId} - Montant: ${amount} FCFA - Utilisateur: ${userId}`);
+                    
+                    // Vérifier d'abord si la transaction n'a pas déjà été créditée
+                    const transactionRef = ref(db, `transactions/${transactionId}`);
+                    const transactionSnapshot = await get(transactionRef);
+                    
+                    if (transactionSnapshot.exists()) {
+                        const transactionData = transactionSnapshot.val();
+                        
+                        // Si déjà créditée, on arrête
+                        if (transactionData.credited === true) {
+                            console.log(`⚠️ Transaction ${transactionId} déjà créditée`);
+                            return;
+                        }
+                    }
+
+                    // Récupérer les données utilisateur
                     const userRef = ref(db, `users/${userId}`);
                     const snapshot = await get(userRef);
 
                     if (snapshot.exists()) {
                         const userData = snapshot.val();
-                        const currentBalance = userData.solde || 0;
-                        const newBalance = currentBalance + parseFloat(amount);
+                        const currentBalance = parseFloat(userData.solde) || 0;
+                        const rechargeAmount = parseFloat(amount) || 0;
+                        const newBalance = currentBalance + rechargeAmount;
 
+                        console.log(`📊 Solde actuel: ${currentBalance} FCFA - Nouveau solde: ${newBalance} FCFA`);
+
+                        // Mise à jour atomique avec timestamp
                         const updates = {};
                         updates[`users/${userId}/solde`] = newBalance;
                         updates[`transactions/${transactionId}/credited`] = true;
+                        updates[`transactions/${transactionId}/creditedAt`] = new Date().toISOString();
+                        updates[`transactions/${transactionId}/processedDate`] = new Date().toISOString();
 
                         await update(ref(db), updates);
-                        creditedTransactions.add(transactionId);
+                        
+                        console.log(`✅ Solde crédité avec succès: ${rechargeAmount} FCFA pour l'utilisateur ${userId}`);
+                        console.log(`💳 Nouveau solde: ${newBalance} FCFA`);
+                        
+                        // Créditer la commission au parrain après avoir crédité le filleul
+                        await creditSponsorCommission(userId, amount, transactionId);
+                        
+                    } else {
+                        console.error(`❌ Utilisateur ${userId} non trouvé pour la transaction ${transactionId}`);
                     }
                 } catch (error) {
-                    console.error('Erreur de mise à jour du solde:', error);
+                    console.error(`❌ Erreur de mise à jour du solde pour transaction ${transactionId}:`, error);
+                }
+            }
+
+            // FONCTION PRINCIPALE AMÉLIORÉE : Traiter toutes les transactions approuvées
+            async function processAllApprovedTransactions(allTransactions) {
+                if (!allTransactions) {
+                    console.log('ℹ️ Aucune transaction à traiter');
+                    return;
+                }
+
+                console.log('🔄 Vérification des transactions à créditer...');
+                let processedCount = 0;
+                
+                for (const [transactionId, transaction] of Object.entries(allTransactions)) {
+                    try {
+                        // Conditions AMÉLIORÉES pour identifier les transactions à créditer
+                        const isApproved = transaction.status === 'success';
+                        const notCredited = transaction.credited !== true; // Plus flexible
+                        const hasUserId = transaction.userId && transaction.userId.trim() !== '';
+                        const hasAmount = transaction.amount && parseFloat(transaction.amount) > 0;
+                        
+                        if (isApproved && notCredited && hasUserId && hasAmount) {
+                            console.log(`🎯 Transaction à traiter trouvée:`, {
+                                id: transactionId,
+                                amount: transaction.amount,
+                                userId: transaction.userId,
+                                status: transaction.status,
+                                credited: transaction.credited
+                            });
+                            
+                            await updateUserBalance(transaction.userId, transaction.amount, transactionId);
+                            processedCount++;
+                            
+                            // Petite pause pour éviter la surcharge
+                            await new Promise(resolve => setTimeout(resolve, 100));
+                        }
+                    } catch (error) {
+                        console.error(`❌ Erreur lors du traitement de la transaction ${transactionId}:`, error);
+                    }
+                }
+                
+                if (processedCount > 0) {
+                    console.log(`✅ ${processedCount} transaction(s) traitée(s) avec succès`);
+                } else {
+                    console.log('ℹ️ Aucune nouvelle transaction à traiter');
                 }
             }
 
@@ -366,14 +505,10 @@ h1:hover i {
                 return translations[status] || status;
             }
 
-            function createHistoryItem(transaction, userId) {
+            function createHistoryItem(transaction) {
                 const historyItem = document.createElement('div');
                 historyItem.className = 'history-item';
                 historyItem.dataset.transactionId = transaction.transactionId || '';
-
-                if (transaction.status === 'success' && !transaction.credited && userId) {
-                    updateUserBalance(userId, transaction.amount || 0, transaction.transactionId);
-                }
 
                 historyItem.innerHTML = `
                     <div class="history-info">
@@ -408,6 +543,9 @@ h1:hover i {
                         ${transaction.processedDate ? `
                             <div class="processing-info">Traité le ${formatDate(transaction.processedDate)}</div>
                         ` : ''}
+                        ${transaction.credited ? `
+                            <div class="credited-info">✅ Crédité le ${formatDate(transaction.creditedAt || transaction.processedDate)}</div>
+                        ` : ''}
                         ${transaction.status === 'failed' && transaction.rejectReason ? `
                             <div class="reject-reason">Motif du rejet: ${transaction.rejectReason}</div>
                         ` : ''}
@@ -420,34 +558,42 @@ h1:hover i {
                 return historyItem;
             }
 
-            function displayTransactions(transactions, userId) {
+            // Fonction pour afficher seulement les transactions de l'utilisateur connecté
+            function displayUserTransactions(allTransactions, currentUserId) {
                 const historyList = document.getElementById('historyList');
                 if (!historyList) return;
                 
-                if (!transactions || Object.keys(transactions).length === 0) {
+                if (!allTransactions || Object.keys(allTransactions).length === 0) {
                     historyList.innerHTML = '<div class="no-records">Aucune transaction trouvée</div>';
                     return;
                 }
 
-                const transactionsArray = Object.entries(transactions)
+                // Filtrer les transactions de l'utilisateur connecté
+                const userTransactions = Object.entries(allTransactions)
+                    .filter(([id, transaction]) => transaction.userId === currentUserId)
                     .map(([id, transaction]) => ({...transaction, id}))
                     .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+                if (userTransactions.length === 0) {
+                    historyList.innerHTML = '<div class="no-records">Aucune transaction trouvée pour votre compte</div>';
+                    return;
+                }
 
                 const fragment = document.createDocumentFragment();
                 let hasNewItems = false;
 
-                transactionsArray.forEach(transaction => {
+                userTransactions.forEach(transaction => {
                     const existingItem = document.querySelector(
                         `[data-transaction-id="${transaction.transactionId}"]`
                     );
 
                     if (existingItem) {
-                        const newItem = createHistoryItem(transaction, userId);
+                        const newItem = createHistoryItem(transaction);
                         if (existingItem.innerHTML !== newItem.innerHTML) {
                             existingItem.parentNode.replaceChild(newItem, existingItem);
                         }
                     } else {
-                        fragment.appendChild(createHistoryItem(transaction, userId));
+                        fragment.appendChild(createHistoryItem(transaction));
                         hasNewItems = true;
                     }
                 });
@@ -460,7 +606,8 @@ h1:hover i {
                     }
                 }
 
-                const currentIds = new Set(transactionsArray.map(t => t.transactionId));
+                // Nettoyer les anciens éléments
+                const currentIds = new Set(userTransactions.map(t => t.transactionId));
                 Array.from(historyList.children).forEach(child => {
                     const id = child.dataset.transactionId;
                     if (id && !currentIds.has(id)) {
@@ -475,25 +622,30 @@ h1:hover i {
                 if (!historyList) return;
                 
                 if (user) {
-                    // Création de la requête avec query et orderByChild
-                    const transactionsRef = query(
-                        ref(db, 'transactions'),
-                        orderByChild('date')
-                    );
+                    console.log(`👤 Utilisateur connecté: ${user.uid}`);
                     
-                    // Écoute des changements
-                    onValue(transactionsRef, (snapshot) => {
+                    // Écouter TOUTES les transactions pour le traitement automatique
+                    const allTransactionsRef = ref(db, 'transactions');
+                    
+                    onValue(allTransactionsRef, async (snapshot) => {
                         try {
-                            const transactions = snapshot.val();
-                            displayTransactions(transactions, user.uid);
+                            const allTransactions = snapshot.val();
+                            console.log(`📊 Nombre total de transactions: ${allTransactions ? Object.keys(allTransactions).length : 0}`);
+                            
+                            // 1. D'abord, traiter toutes les transactions approuvées (créditer automatiquement)
+                            await processAllApprovedTransactions(allTransactions);
+                            
+                            // 2. Ensuite, afficher seulement les transactions de l'utilisateur connecté
+                            displayUserTransactions(allTransactions, user.uid);
+                            
                         } catch (error) {
-                            console.error('Erreur lors de la récupération des transactions:', error);
+                            console.error('❌ Erreur lors de la récupération des transactions:', error);
                             if (historyList) {
                                 historyList.innerHTML = '<div class="no-records">Erreur lors du chargement des transactions</div>';
                             }
                         }
                     }, (error) => {
-                        console.error('Erreur Firebase:', error);
+                        console.error('❌ Erreur Firebase:', error);
                         if (historyList) {
                             historyList.innerHTML = '<div class="no-records">Erreur de connexion</div>';
                         }
@@ -504,7 +656,7 @@ h1:hover i {
             });
 
         } catch (error) {
-            console.error('Erreur d\'initialisation:', error);
+            console.error('❌ Erreur d\'initialisation:', error);
             const historyList = document.getElementById('historyList');
             if (historyList) {
                 historyList.innerHTML = '<div class="no-records">Erreur d\'initialisation de l\'application</div>';
