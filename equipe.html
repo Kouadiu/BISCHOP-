@@ -136,121 +136,369 @@
         </div>
     </div>
     
-    <script type="module">
-        // Le script Firebase reste le même que dans votre version originale
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-        import { getDatabase, ref, get, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+    import { getDatabase, ref, get, onValue, update } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-database.js";
 
-        // Votre configuration Firebase existante
-        const firebaseConfig = {
-            apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
-            authDomain: "paris-3df9f.firebaseapp.com",
-            databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
-            projectId: "paris-3df9f",
-            storageBucket: "paris-3df9f.appspot.com",
-            messagingSenderId: "365107415196",
-            appId: "1:365107415196:web:4c0021baec5a51a0f50559"
-        };
+    // Configuration Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyCPQvlxIjvJPkMZQ4qElkHla_xQ5QiZfFs",
+        authDomain: "paris-3df9f.firebaseapp.com",
+        databaseURL: "https://paris-3df9f-default-rtdb.firebaseio.com",
+        projectId: "paris-3df9f",
+        storageBucket: "paris-3df9f.appspot.com",
+        messagingSenderId: "365107415196",
+        appId: "1:365107415196:web:4c0021baec5a51a0f50559"
+    };
 
-           const app = initializeApp(firebaseConfig);
+    const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const database = getDatabase(app);
 
-    // Fonction pour mettre à jour la commission
-    async function updateCommission(userRef, currentBalance, newCommission) {
+    // Fonction pour afficher une notification de bonus
+    function showBonusNotification(amount, reason = "Bonus de parrainage") {
+        const notification = document.createElement('div');
+        notification.style.cssText = `
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: linear-gradient(135deg, #ff6b35, #f7931e);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+            z-index: 1000;
+            font-weight: bold;
+            animation: slideInBonus 0.3s ease, fadeOutBonus 0.3s ease 4.7s;
+            min-width: 280px;
+            text-align: center;
+        `;
+        
+        notification.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">🎉</span>
+                <div>
+                    <div style="font-size: 16px;">${reason}</div>
+                    <div style="font-size: 18px; font-weight: bold;">+${parseFloat(amount).toLocaleString('fr-FR')} FCFA</div>
+                    <div style="font-size: 12px; opacity: 0.9;">Ajouté à votre solde principal</div>
+                </div>
+            </div>
+        `;
+        
+        // Ajouter les animations CSS pour les bonus
+        if (!document.getElementById('bonus-notification-styles')) {
+            const style = document.createElement('style');
+            style.id = 'bonus-notification-styles';
+            style.textContent = `
+                @keyframes slideInBonus {
+                    from { transform: translateX(100%) scale(0.8); opacity: 0; }
+                    to { transform: translateX(0) scale(1); opacity: 1; }
+                }
+                @keyframes fadeOutBonus {
+                    from { opacity: 1; transform: scale(1); }
+                    to { opacity: 0; transform: scale(0.9); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+        
+        document.body.appendChild(notification);
+        
+        // Supprimer la notification après 5 secondes
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 5000);
+    }
+
+    // Fonction pour transférer le bonus de commission vers le solde principal
+    async function transferCommissionToBalance(userId) {
         try {
-            await update(userRef, {
-                commissionBalance: currentBalance + newCommission
-            });
-            document.getElementById("commissionBalance").innerText = `${currentBalance + newCommission} FCFA`;
+            const userRef = ref(database, 'users/' + userId);
+            const snapshot = await get(userRef);
+            
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                const commissionBalance = userData.commissionBalance || 0;
+                
+                if (commissionBalance > 0) {
+                    // Récupérer le solde principal (priorité à 'solde', puis 'balance')
+                    const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                    
+                    // Calculer le nouveau solde
+                    const newBalance = currentBalance + commissionBalance;
+                    
+                    // Mettre à jour la base de données
+                    const updates = {
+                        balance: newBalance,
+                        solde: newBalance, // Maintenir la synchronisation
+                        commissionBalance: 0, // Remettre à zéro les commissions
+                        lastBonusTransfer: new Date().toISOString()
+                    };
+                    
+                    await update(userRef, updates);
+                    
+                    // Afficher la notification
+                    showBonusNotification(commissionBalance, "Bonus de parrainage transféré");
+                    
+                    console.log(`💰 Bonus transféré: ${commissionBalance} FCFA ajouté au solde principal`);
+                    
+                    return true;
+                }
+            }
+            return false;
         } catch (error) {
-            console.error("Erreur lors de la mise à jour de la commission:", error);
+            console.error("❌ Erreur lors du transfert du bonus:", error);
+            return false;
         }
     }
+
+    // Fonction pour ajouter automatiquement les bonus au solde
+    async function addBonusToBalance(userId, bonusAmount, reason = "Bonus de parrainage") {
+        try {
+            const userRef = ref(database, 'users/' + userId);
+            const snapshot = await get(userRef);
+            
+            if (snapshot.exists()) {
+                const userData = snapshot.val();
+                
+                // Récupérer le solde principal (priorité à 'solde', puis 'balance')
+                const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                
+                // Calculer le nouveau solde
+                const newBalance = currentBalance + bonusAmount;
+                
+                // Mettre à jour la base de données
+                const updates = {
+                    balance: newBalance,
+                    solde: newBalance, // Maintenir la synchronisation
+                    lastBonusReceived: new Date().toISOString(),
+                    totalBonusReceived: (userData.totalBonusReceived || 0) + bonusAmount
+                };
+                
+                await update(userRef, updates);
+                
+                // Afficher la notification
+                showBonusNotification(bonusAmount, reason);
+                
+                console.log(`🎉 Bonus ajouté: ${bonusAmount} FCFA ajouté directement au solde`);
+                
+                return true;
+            }
+            return false;
+        } catch (error) {
+            console.error("❌ Erreur lors de l'ajout du bonus au solde:", error);
+            return false;
+        }
+    }
+
+    // Fonction pour compter les filleuls
+    async function countReferrals(referralCode) {
+        try {
+            const allUsersRef = ref(database, 'users/');
+            const allUsersSnapshot = await get(allUsersRef);
+            let count = 0;
+
+            if (allUsersSnapshot.exists()) {
+                const users = allUsersSnapshot.val();
+                for (const uid in users) {
+                    const user = users[uid];
+                    if (user.referralCodeUsed === referralCode) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        } catch (error) {
+            console.error("Erreur lors du comptage des filleuls:", error);
+            return 0;
+        }
+    }
+
+    // Variable pour suivre les changements de commission
+    let lastCommissionBalance = 0;
 
     onAuthStateChanged(auth, async (user) => {
         if (user) {
             try {
                 const userRef = ref(database, 'users/' + user.uid);
-                const snapshot = await get(userRef);
                 
-                if (snapshot.exists()) {
-                    const userData = snapshot.val();
-                    const referralCode = userData.userReferralCode;
-                    const commissionBalance = userData.commissionBalance || 0;
+                // Écouter les changements en temps réel pour la commission
+                onValue(userRef, async (snapshot) => {
+                    if (snapshot.exists()) {
+                        const userData = snapshot.val();
+                        const referralCode = userData.userReferralCode;
+                        const commissionBalance = userData.commissionBalance || 0;
 
-                    document.getElementById("referralCode").innerText = referralCode;
-                    document.getElementById("commissionBalance").innerText = `${commissionBalance} FCFA`;
+                        // DÉTECTION D'AUGMENTATION DE COMMISSION
+                        if (commissionBalance > lastCommissionBalance && lastCommissionBalance !== null) {
+                            const bonusReceived = commissionBalance - lastCommissionBalance;
+                            console.log(`🎯 Nouvelle commission détectée: ${bonusReceived} FCFA`);
+                            
+                            // OPTION 1: Ajouter directement au solde principal
+                            await addBonusToBalance(user.uid, bonusReceived, "Nouvelle commission de parrainage");
+                        }
+                        
+                        lastCommissionBalance = commissionBalance;
 
-                    const referralLink = `${window.location.origin}/index.html?referral=${referralCode}`;
-                    document.getElementById("referralLink").innerText = referralLink;
+                        // Mettre à jour l'affichage
+                        const referralCodeElement = document.getElementById("referralCode");
+                        if (referralCodeElement) {
+                            referralCodeElement.innerText = referralCode;
+                        }
+                        
+                        const commissionBalanceElement = document.getElementById("commissionBalance");
+                        if (commissionBalanceElement) {
+                            commissionBalanceElement.innerText = `${commissionBalance.toLocaleString('fr-FR')} FCFA`;
+                        }
 
-                    // Gestion des parrainages et commissions
-                    const allUsersRef = ref(database, 'users/');
-                    const allUsersSnapshot = await get(allUsersRef);
-                    let count = 0;
+                        // Générer le lien de parrainage
+                        const referralLinkElement = document.getElementById("referralLink");
+                        if (referralLinkElement) {
+                            const referralLink = `${window.location.origin}/index.html?referral=${referralCode}`;
+                            referralLinkElement.innerText = referralLink;
+                        }
 
-                    if (allUsersSnapshot.exists()) {
-                        const users = allUsersSnapshot.val();
-                        for (const uid in users) {
-                            const referredUser = users[uid];
-                            if (referredUser.referralCodeUsed === referralCode) {
-                                count++;
-                                
-                                // Vérifier si l'utilisateur a une balance positive et n'a pas encore généré de commission
-                                if (referredUser.balance > 0 && !referredUser.hasCommissionBeenPaid) {
-                                    const rechargeAmount = referredUser.balance;
-                                    const commission = rechargeAmount * 0.10;
+                        // Compter les filleuls
+                        const referralCount = await countReferrals(referralCode);
+                        const referralCountElement = document.getElementById("referralCount");
+                        if (referralCountElement) {
+                            referralCountElement.innerText = referralCount;
+                        }
 
-                                    // Marquer la commission comme payée pour cet utilisateur
-                                    await update(ref(database, `users/${uid}`), {
-                                        hasCommissionBeenPaid: true
-                                    });
-
-                                    // Mettre à jour la commission du parrain
-                                    await updateCommission(userRef, commissionBalance, commission);
-                                }
-                            }
+                        // Afficher le total des bonus reçus
+                        const totalBonusElement = document.getElementById("totalBonusReceived");
+                        if (totalBonusElement && userData.totalBonusReceived) {
+                            totalBonusElement.innerText = `${userData.totalBonusReceived.toLocaleString('fr-FR')} FCFA`;
+                        }
+                        
+                    } else {
+                        const referralCodeElement = document.getElementById("referralCode");
+                        if (referralCodeElement) {
+                            referralCodeElement.innerText = "Code non disponible.";
                         }
                     }
+                });
 
-                    document.getElementById("referralCount").innerText = count;
-                } else {
-                    document.getElementById("referralCode").innerText = "Code non disponible.";
-                }
             } catch (error) {
                 console.error("Erreur:", error);
-                document.getElementById("referralCode").innerText = "Erreur de chargement.";
+                const referralCodeElement = document.getElementById("referralCode");
+                if (referralCodeElement) {
+                    referralCodeElement.innerText = "Erreur de chargement.";
+                }
             }
         } else {
-            document.getElementById("referralCode").innerText = "Veuillez vous connecter.";
+            const referralCodeElement = document.getElementById("referralCode");
+            if (referralCodeElement) {
+                referralCodeElement.innerText = "Veuillez vous connecter.";
+            }
             alert("Vous devez être connecté pour voir votre code de parrainage.");
             window.location.href = "login.html";
         }
     });
 
-    // Copier le code de parrainage
-    document.getElementById("referralCode").onclick = function() {
-        const code = this.innerText;
-        navigator.clipboard.writeText(code).then(() => {
-            document.getElementById("copyMessage").style.display = "block";
-            setTimeout(() => {
-                document.getElementById("copyMessage").style.display = "none";
-            }, 2000);
+    // Fonction pour afficher l'historique des commissions avec informations sur les transferts
+    function displayCommissionHistory(user) {
+        const commissionHistoryRef = ref(database, `commissionHistory/${user.uid}`);
+        
+        onValue(commissionHistoryRef, (snapshot) => {
+            const historyContainer = document.getElementById("commissionHistory");
+            if (!historyContainer) return;
+
+            if (snapshot.exists()) {
+                const history = snapshot.val();
+                let historyHTML = '<h3>Historique des Commissions</h3>';
+                
+                // Convertir en tableau et trier par date
+                const historyArray = Object.values(history).sort((a, b) => 
+                    new Date(b.date) - new Date(a.date)
+                );
+                
+                historyArray.forEach(commission => {
+                    const date = new Date(commission.date).toLocaleDateString('fr-FR');
+                    historyHTML += `
+                        <div class="commission-item" style="border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 5px;">
+                            <div><strong>Commission: ${commission.amount} FCFA</strong></div>
+                            <div>Recharge: ${commission.rechargeAmount} FCFA</div>
+                            <div>Date: ${date}</div>
+                            <div>Transaction: ${commission.transactionId}</div>
+                            <div style="color: #28a745; font-size: 12px;"><em>✅ Automatiquement ajouté au solde</em></div>
+                        </div>
+                    `;
+                });
+                
+                historyContainer.innerHTML = historyHTML;
+            } else {
+                historyContainer.innerHTML = '<div>Aucune commission reçue pour le moment</div>';
+            }
         });
+    }
+
+    // Ajouter l'affichage de l'historique si l'utilisateur est connecté
+    onAuthStateChanged(auth, (user) => {
+        if (user) {
+            displayCommissionHistory(user);
+        }
+    });
+
+    // Fonction publique pour transférer manuellement les commissions (bouton optionnel)
+    window.transferBonusToBalance = async function() {
+        const user = auth.currentUser;
+        if (user) {
+            const success = await transferCommissionToBalance(user.uid);
+            if (success) {
+                alert("Bonus transféré avec succès vers votre solde principal !");
+            } else {
+                alert("Aucun bonus à transférer ou erreur lors du transfert.");
+            }
+        } else {
+            alert("Veuillez vous connecter.");
+        }
     };
 
-    // Copier le lien de parrainage
-    document.getElementById("referralLink").onclick = function() {
-        const link = this.innerText;
-        navigator.clipboard.writeText(link).then(() => {
-            document.getElementById("copyLinkMessage").style.display = "block";
-            setTimeout(() => {
-                document.getElementById("copyLinkMessage").style.display = "none";
-            }, 2000);
-        });
-    };
-</script> 
+    // Copier le code de parrainage
+    document.addEventListener('DOMContentLoaded', () => {
+        const referralCodeElement = document.getElementById("referralCode");
+        if (referralCodeElement) {
+            referralCodeElement.onclick = function() {
+                const code = this.innerText;
+                if (code !== "Veuillez vous connecter." && code !== "Code non disponible." && code !== "Erreur de chargement.") {
+                    navigator.clipboard.writeText(code).then(() => {
+                        const copyMessage = document.getElementById("copyMessage");
+                        if (copyMessage) {
+                            copyMessage.style.display = "block";
+                            setTimeout(() => {
+                                copyMessage.style.display = "none";
+                            }, 2000);
+                        }
+                    });
+                }
+            };
+        }
+
+        // Copier le lien de parrainage
+        const referralLinkElement = document.getElementById("referralLink");
+        if (referralLinkElement) {
+            referralLinkElement.onclick = function() {
+                const link = this.innerText;
+                if (link && !link.includes("undefined")) {
+                    navigator.clipboard.writeText(link).then(() => {
+                        const copyLinkMessage = document.getElementById("copyLinkMessage");
+                        if (copyLinkMessage) {
+                            copyLinkMessage.style.display = "block";
+                            setTimeout(() => {
+                                copyLinkMessage.style.display = "none";
+                            }, 2000);
+                        }
+                    });
+                }
+            };
+        }
+    });
+
+    console.log("🚀 Script de parrainage avec bonus automatique initialisé");
+</script>
 </body>
 </html>
