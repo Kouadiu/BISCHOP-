@@ -538,6 +538,176 @@
         const auth = getAuth(app);
         const database = getDatabase(app);
 
+        // Variables pour suivre l'état et éviter les doubles crédits de commission
+        let lastCommissionBalance = null;
+        let processedCommissions = new Set();
+        let isInitialized = false;
+        let currentUserId = null;
+
+        // Fonction pour charger les commissions déjà traitées
+        async function loadProcessedCommissions(userId) {
+            try {
+                const processedCommissionsRef = ref(database, `users/${userId}/processedCommissions`);
+                const snapshot = await get(processedCommissionsRef);
+                
+                if (snapshot.exists()) {
+                    const commissions = snapshot.val();
+                    processedCommissions.clear();
+                    Object.keys(commissions).forEach(commissionId => {
+                        processedCommissions.add(commissionId);
+                    });
+                    console.log(`📋 ${processedCommissions.size} commissions déjà traitées chargées`);
+                }
+            } catch (error) {
+                console.error("❌ Erreur lors du chargement des commissions traitées:", error);
+            }
+        }
+
+        // Fonction pour vérifier si une commission a déjà été traitée
+        async function isCommissionAlreadyProcessed(userId, commissionId) {
+            try {
+                const processedCommissionRef = ref(database, `users/${userId}/processedCommissions/${commissionId}`);
+                const snapshot = await get(processedCommissionRef);
+                return snapshot.exists();
+            } catch (error) {
+                console.error("❌ Erreur lors de la vérification de la commission:", error);
+                return false;
+            }
+        }
+
+        // Fonction pour enregistrer une commission comme traitée
+        async function recordProcessedCommission(userId, commissionId, amount, reason) {
+            try {
+                const processedCommissionRef = ref(database, `users/${userId}/processedCommissions/${commissionId}`);
+                await update(processedCommissionRef, {
+                    amount: amount,
+                    reason: reason,
+                    processedAt: new Date().toISOString(),
+                    timestamp: Date.now()
+                });
+                return true;
+            } catch (error) {
+                console.error("❌ Erreur lors de l'enregistrement de la commission traitée:", error);
+                return false;
+            }
+        }
+
+        // Fonction pour traiter automatiquement les nouvelles commissions
+        async function processNewCommission(userId, commissionAmount) {
+            try {
+                // Générer un ID unique pour cette commission
+                const commissionId = `commission_${Date.now()}_${commissionAmount}_${Math.random().toString(36).substr(2, 9)}`;
+                
+                // Vérifier si cette commission a déjà été traitée
+                if (await isCommissionAlreadyProcessed(userId, commissionId) || processedCommissions.has(commissionId)) {
+                    console.log(`⚠️ Commission déjà traitée, ignorée: ${commissionAmount} FCFA`);
+                    return false;
+                }
+
+                const userRef = ref(database, 'users/' + userId);
+                const snapshot = await get(userRef);
+                
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    
+                    // Récupérer le solde principal (priorité à 'solde', puis 'balance')
+                    const currentBalance = userData.solde !== undefined ? userData.solde : (userData.balance || 0);
+                    
+                    // Calculer le nouveau solde
+                    const newBalance = currentBalance + commissionAmount;
+                    
+                    // Mettre à jour la base de données avec le nouveau solde ET enregistrer la commission traitée
+                    const updates = {
+                        balance: newBalance,
+                        solde: newBalance, // Maintenir la synchronisation
+                        lastCommissionReceived: new Date().toISOString(),
+                        totalCommissionReceived: (userData.totalCommissionReceived || 0) + commissionAmount,
+                        // Remettre la commissionBalance à zéro après transfert au solde principal
+                        commissionBalance: 0,
+                        [`processedCommissions/${commissionId}`]: {
+                            amount: commissionAmount,
+                            reason: "Commission automatiquement ajoutée au solde",
+                            processedAt: new Date().toISOString(),
+                            timestamp: Date.now()
+                        }
+                    };
+                    
+                    await update(userRef, updates);
+                    
+                    // Ajouter à notre cache local
+                    processedCommissions.add(commissionId);
+                    
+                    // Afficher la notification de commission
+                    showCommissionNotification(commissionAmount);
+                    
+                    console.log(`🎉 Commission traitée avec succès: ${commissionAmount} FCFA ajoutée au solde (ID: ${commissionId})`);
+                    
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error("❌ Erreur lors du traitement de la commission:", error);
+                return false;
+            }
+        }
+
+        // Fonction pour afficher une notification de commission
+        function showCommissionNotification(amount) {
+            const notification = document.createElement('div');
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                left: 20px;
+                background: linear-gradient(135deg, #ff6b35, #f7931e);
+                color: white;
+                padding: 15px 20px;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(255, 107, 53, 0.3);
+                z-index: 1000;
+                font-weight: bold;
+                animation: slideInCommission 0.3s ease, fadeOutCommission 0.3s ease 4.7s;
+                min-width: 280px;
+                text-align: center;
+            `;
+            
+            notification.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <span style="font-size: 24px;">🎯</span>
+                    <div>
+                        <div style="font-size: 16px;">Commission de parrainage</div>
+                        <div style="font-size: 18px; font-weight: bold;">+${parseFloat(amount).toLocaleString('fr-FR')} FCFA</div>
+                        <div style="font-size: 12px; opacity: 0.9;">Ajouté à votre solde principal</div>
+                    </div>
+                </div>
+            `;
+            
+            // Ajouter les animations CSS pour les commissions
+            if (!document.getElementById('commission-notification-styles')) {
+                const style = document.createElement('style');
+                style.id = 'commission-notification-styles';
+                style.textContent = `
+                    @keyframes slideInCommission {
+                        from { transform: translateX(-100%) scale(0.8); opacity: 0; }
+                        to { transform: translateX(0) scale(1); opacity: 1; }
+                    }
+                    @keyframes fadeOutCommission {
+                        from { opacity: 1; transform: scale(1); }
+                        to { opacity: 0; transform: scale(0.9); }
+                    }
+                `;
+                document.head.appendChild(style);
+            }
+            
+            document.body.appendChild(notification);
+            
+            // Supprimer la notification après 5 secondes
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 5000);
+        }
+
         // Fonction pour initialiser un compte utilisateur
         async function initializeUserAccount(user) {
             try {
@@ -551,6 +721,7 @@
                         solde: 200, // Utiliser 'solde' au lieu de 'balance' pour correspondre au script de crédit
                         balance: 200, // Garder aussi 'balance' pour la compatibilité
                         commissionBalance: 0,
+                        totalCommissionReceived: 0,
                         createdAt: new Date().toISOString()
                     });
                     console.log("✅ Nouveau compte créé avec 200 FCFA");
@@ -571,6 +742,11 @@
                     // Ajouter commissionBalance si manquant
                     if (userData.commissionBalance === undefined) {
                         updates[`users/${user.uid}/commissionBalance`] = 0;
+                    }
+                    
+                    // Ajouter totalCommissionReceived si manquant
+                    if (userData.totalCommissionReceived === undefined) {
+                        updates[`users/${user.uid}/totalCommissionReceived`] = 0;
                     }
                     
                     if (Object.keys(updates).length > 0) {
@@ -666,6 +842,10 @@
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 console.log(`👤 Utilisateur connecté: ${user.uid}`);
+                currentUserId = user.uid;
+                
+                // Charger les commissions déjà traitées
+                await loadProcessedCommissions(user.uid);
                 
                 // Afficher l'email
                 const emailElement = document.getElementById("email");
@@ -678,12 +858,39 @@
                 const userRef = ref(database, 'users/' + user.uid);
                 let previousBalance = null;
                 
-                onValue(userRef, (snapshot) => {
+                onValue(userRef, async (snapshot) => {
                     if (snapshot.exists()) {
                         const userData = snapshot.val();
                         
                         // Utiliser 'solde' en priorité, puis 'balance' comme fallback
                         const currentBalance = userData.solde !== undefined ? userData.solde : userData.balance || 0;
+                        const commissionBalance = userData.commissionBalance || 0;
+                        
+                        // DÉTECTION ET TRAITEMENT AUTOMATIQUE DES NOUVELLES COMMISSIONS
+                        if (isInitialized && commissionBalance > 0 && commissionBalance !== lastCommissionBalance) {
+                            if (lastCommissionBalance !== null && commissionBalance > lastCommissionBalance) {
+                                const newCommission = commissionBalance - lastCommissionBalance;
+                                console.log(`🎯 Nouvelle commission détectée: ${newCommission} FCFA`);
+                                
+                                // Traiter automatiquement la nouvelle commission
+                                await processNewCommission(user.uid, newCommission);
+                            } else if (lastCommissionBalance === null) {
+                                // Première fois qu'on détecte une commission
+                                console.log(`🎯 Commission existante détectée: ${commissionBalance} FCFA`);
+                                
+                                // Traiter la commission existante si elle n'a pas encore été traitée
+                                await processNewCommission(user.uid, commissionBalance);
+                            }
+                        }
+                        
+                        // Mettre à jour la dernière valeur de commission connue
+                        lastCommissionBalance = commissionBalance;
+                        
+                        // Marquer comme initialisé après la première lecture
+                        if (!isInitialized) {
+                            isInitialized = true;
+                            console.log(`🔄 Initialisation terminée. Solde: ${currentBalance} FCFA, Commission: ${commissionBalance} FCFA`);
+                        }
                         
                         // Détecter si c'est une mise à jour (augmentation du solde)
                         const isUpdate = previousBalance !== null && currentBalance > previousBalance;
@@ -692,7 +899,14 @@
                         if (isUpdate) {
                             const difference = currentBalance - previousBalance;
                             console.log(`💰 Solde mis à jour: +${difference} FCFA (nouveau solde: ${currentBalance} FCFA)`);
-                            showCreditNotification(difference);
+                            
+                            // Vérifier si c'est une commission ou une recharge normale
+                            if (difference <= 50) { // Supposant que les commissions sont généralement <= 50 FCFA
+                                // C'est probablement une commission, pas besoin de notification car déjà gérée
+                            } else {
+                                // C'est probablement une recharge
+                                showCreditNotification(difference);
+                            }
                         }
                         
                         // Mettre à jour l'affichage
@@ -700,14 +914,20 @@
                         
                         // Afficher la commission si elle existe
                         const commissionElement = document.getElementById("commission");
-                        if (commissionElement && userData.commissionBalance !== undefined) {
-                            commissionElement.textContent = `${parseFloat(userData.commissionBalance).toLocaleString('fr-FR')} FCFA`;
+                        if (commissionElement) {
+                            commissionElement.textContent = `${parseFloat(commissionBalance).toLocaleString('fr-FR')} FCFA`;
+                        }
+                        
+                        // Afficher le total des commissions reçues
+                        const totalCommissionElement = document.getElementById("totalCommission");
+                        if (totalCommissionElement && userData.totalCommissionReceived) {
+                            totalCommissionElement.textContent = `${userData.totalCommissionReceived.toLocaleString('fr-FR')} FCFA`;
                         }
                         
                         // Sauvegarder le solde actuel pour la prochaine comparaison
                         previousBalance = currentBalance;
                         
-                        console.log(`💳 Solde actuel: ${currentBalance} FCFA`);
+                        console.log(`💳 Solde actuel: ${currentBalance} FCFA, Commission: ${commissionBalance} FCFA`);
                     } else {
                         console.log("❌ Données utilisateur non trouvées");
                         updateBalanceDisplay(0);
@@ -741,6 +961,10 @@
             } else {
                 // Utilisateur non connecté
                 console.log("❌ Utilisateur non connecté");
+                currentUserId = null;
+                isInitialized = false;
+                lastCommissionBalance = null;
+                processedCommissions.clear();
                 
                 const balanceElement = document.getElementById("balance");
                 if (balanceElement) balanceElement.textContent = "Veuillez vous connecter";
@@ -777,7 +1001,35 @@
             }
         }
 
-        console.log("🚀 Script de gestion des soldes initialisé");
+        // Fonction pour nettoyer les anciennes commissions traitées (optionnel)
+        window.cleanOldProcessedCommissions = async function(daysOld = 30) {
+            const user = auth.currentUser;
+            if (user) {
+                try {
+                    const processedCommissionsRef = ref(database, `users/${user.uid}/processedCommissions`);
+                    const snapshot = await get(processedCommissionsRef);
+                    
+                    if (snapshot.exists()) {
+                        const commissions = snapshot.val();
+                        const cutoffDate = Date.now() - (daysOld * 24 * 60 * 60 * 1000);
+                        let deletedCount = 0;
+                        
+                        for (const [commissionId, commission] of Object.entries(commissions)) {
+                            if (commission.timestamp && commission.timestamp < cutoffDate) {
+                                await update(ref(database, `users/${user.uid}/processedCommissions/${commissionId}`), null);
+                                deletedCount++;
+                            }
+                        }
+                        
+                        console.log(`🧹 ${deletedCount} anciennes commissions traitées supprimées`);
+                    }
+                } catch (error) {
+                    console.error("❌ Erreur lors du nettoyage:", error);
+                }
+            }
+        };
+
+        console.log("🚀 Script de gestion des soldes avec protection anti-doublon pour commissions initialisé");
     </script>
 </body>
 </html>
